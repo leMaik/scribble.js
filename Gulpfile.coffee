@@ -13,6 +13,7 @@ gulp.task 'scripts', ->
         transform: ['coffeeify']
         extensions: ['.coffee']
         debug: no
+        standalone: 'sketchjs'
     bundler.bundle()
     .pipe source 'sketch.js'
     .pipe gulp.dest './lib'
