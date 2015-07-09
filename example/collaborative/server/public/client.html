@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  
+  <head>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src='sketch.js'></script>
+    <script src="channel/bcsocket.js"></script>
+    <script src="share/share.js"></script>
+    <script src="share/json.js"></script>
+    <script>
+      sketchjs($);
+    
+      $(function() {
+        sketch = $('#simple_sketch').sketch();
+    
+        sharejs.open('hello', 'json', 'http://localhost:8000/channel', function(error, doc) {
+          console.log(error);
+          if (!doc.type)
+            doc.create('json0', []);
+          
+          doc.on('change', function(op) {
+            sketch.setShapes(doc.snapshot);
+          });
+          sketch.on('change', function(){
+            doc.set(sketch.getShapes());
+          });
+        });
+      });
+    </script>
+  </head>
+  
+  <body>
+    <canvas id='simple_sketch' width='400' height='400' style='border: 2px solid black'></canvas>
+  </body>
+
+</html>
