@@ -14,7 +14,10 @@
         $('#tools_sketch').sketch();
         
         $('#printshapes').on('click', function() {
-          console.log($('#tools_sketch').sketch().getShapes());
+          var sketch = $('#tools_sketch').sketch();
+          var json = JSON.stringify(sketch.getShapes());
+          console.log(json);
+          sketch.loadShapes(JSON.parse(json));
         });
       });
     </script>

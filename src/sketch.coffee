@@ -118,6 +118,10 @@ sketchjs = ($) ->
         if action.events?
           shapes.push action
       return shapes
+      
+    loadShapes: (shapes) ->
+      @actions = shapes
+      @redraw()
         
     # ### sketch.set(key, value)
     #
@@ -208,7 +212,6 @@ sketchjs = ($) ->
         @action.events.push
           x: e.pageX - @canvas.offset().left
           y: e.pageY - @canvas.offset().top
-          event: e.type
 
         @redraw()
 
