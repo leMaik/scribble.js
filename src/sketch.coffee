@@ -207,7 +207,30 @@ sketchjs = ($) ->
       @context.strokeStyle = action.color
       @context.lineWidth = action.size
       @context.stroke()
+  
+  # ## highlighter
+  #
+  # The highlighter works like the marker but uses a different blending mode to look more like a highlighter.
+  $.sketch.tools.highlighter =
+    onEvent: (e)->
+      $.sketch.tools.marker.onEvent.call this, e
 
+    draw: (action)->
+      @context.lineJoin = "round"
+      @context.lineCap = "round"
+      @context.beginPath()
+      
+      @context.moveTo action.events[0].x, action.events[0].y
+      for event in action.events
+        @context.lineTo event.x, event.y
+
+        previous = event
+      @context.strokeStyle = action.color
+      @context.lineWidth = action.size
+      @context.globalCompositeOperation = "multiply"
+      @context.stroke()
+      @context.globalCompositeOperation = "source-over"
+      
   # ## eraser
   #
   # The eraser does just what you'd expect: removes any of the existing sketch.
