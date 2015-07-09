@@ -65,6 +65,13 @@ sketchjs = ($) ->
       @color = @options.defaultColor
       @size = @options.defaultSize
       @tool = @options.defaultTool
+      @background = undefined
+      if @canvas.data('background')?
+        bgImage = new Image()
+        bgImage.onload = =>
+          @background = bgImage
+          @redraw()
+        bgImage.src = @canvas.data('background')
       @actions = []
       @action = []
 
@@ -157,6 +164,10 @@ sketchjs = ($) ->
     redraw: ->
       @el.width = @canvas.width()
       @context = @el.getContext '2d'
+      
+      if @background?
+        @context.drawImage @background, 0, 0
+      
       sketch = this
       $.each @actions, ->
         if this.tool
@@ -253,10 +264,11 @@ sketchjs = ($) ->
         newActions = []
         for otherAction in @actions
           remove = no
-          for event in otherAction.events
-            if inRadius(location, event)
-              remove = yes
-              break
+          if otherAction.events?
+            for event in otherAction.events
+              if inRadius(location, event)
+                remove = yes
+                break
           
           if not remove
             newActions.push otherAction
