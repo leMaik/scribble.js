@@ -13,14 +13,24 @@
       $(function() {
         sketch = $('#simple_sketch').sketch();
     
-        sharejs.open('hello', 'json', 'http://localhost:8000/channel', function(error, doc) {
-          console.log(error);
+        var getUrlParameter = function (name) {
+            return (new RegExp(name + '=' + '(.+?)(&|$)').exec(window.location.search)||[,null])[1];
+        };
+
+        var ws = new WebSocket('ws://127.0.0.1:8080');
+        var share = new sharejs.Connection(ws);
+
+        var doc = share.get('docs', getUrlParameter('doc'));
+        doc.subscribe();
+
+        doc.whenReady(function () {
           if (!doc.type)
-            doc.create('json0', []);
+            doc.create('json', []);
           
           doc.on('change', function(op) {
             sketch.setShapes(doc.snapshot);
           });
+          
           sketch.on('change', function(){
             doc.set(sketch.getShapes());
           });
