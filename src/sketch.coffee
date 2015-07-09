@@ -119,9 +119,10 @@ sketchjs = ($) ->
           shapes.push action
       return shapes
       
-    loadShapes: (shapes) ->
+    loadShapes: (shapes, silent = no) ->
       @actions = shapes
       @redraw()
+      @canvas.trigger("sketch.update") if not silent
         
     # ### sketch.set(key, value)
     #
@@ -153,6 +154,7 @@ sketchjs = ($) ->
       @painting = false
       @action = null
       @redraw()
+      @canvas.trigger("sketch.update")
     
     # ### sketch.onEvent(e)
     #
