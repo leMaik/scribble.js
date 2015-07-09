@@ -213,13 +213,35 @@ sketchjs = ($) ->
   # The eraser does just what you'd expect: removes any of the existing sketch.
   $.sketch.tools.eraser =
     onEvent: (e)->
-      $.sketch.tools.marker.onEvent.call this, e
-    draw: (action)->
-      oldcomposite = @context.globalCompositeOperation
-      @context.globalCompositeOperation = "destination-out"
-      action.color = "rgba(0,0,0,1)"
-      $.sketch.tools.marker.draw.call this, action
-      @context.globalCompositeOperation = oldcomposite
+      switch e.type
+        when 'mousedown', 'touchstart'
+          @startPainting()
+        when 'mouseup', 'mouseout', 'mouseleave', 'touchend', 'touchcancel'
+          @stopPainting()
+
+      if @painting
+        location =
+          x: e.pageX - @canvas.offset().left
+          y: e.pageY - @canvas.offset().top
+          event: e.type
+
+        inRadius = (p1, p2, r = 10) -> Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r
+        
+        newActions = []
+        for otherAction in @actions
+          remove = no
+          for event in otherAction.events
+            if inRadius(location, event)
+              remove = yes
+              break
+          
+          if not remove
+            newActions.push otherAction
+            
+        @actions = newActions
+        @redraw()
+      
+    draw: (action) ->
 
 # ## Sketch.js module
 # 
