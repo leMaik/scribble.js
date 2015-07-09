@@ -15,7 +15,7 @@ app = connect()
  
 app.use morgan()
 app.use '/srv', serveStatic sharejs.scriptsDir
-app.use serveStatic "#{__dirname}/app"
+app.use serveStatic "#{__dirname}/public"
  
 backend = livedb.client livedb.memory()
 #backend = livedb.client livedbMongo('localhost:27017/test?auto_reconnect', safe:false)
