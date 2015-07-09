@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src='../lib/sketch.js'></script>
+    <script type='text/javascript'>
+      sketchjs($);
+      
+      $(function() {
+        $.each(['#f00', '#ff0', '#0f0', '#0ff', '#00f', '#000', '#fff'], function() {
+          $('#tools').append("<a href='#tools_sketch' data-color='" + this + "' style='border: 1px solid black; width: 30px; height: 30px; background: " + this + "; display: inline-block;'></a> ");
+        });
+
+        $('#tools_sketch').sketch();
+      });
+    </script>
+  </head>
+  <body>
+    <div id='tools'>
+      <a href="#tools_sketch" data-tool="marker">Marker</a>
+      <a href="#tools_sketch" data-tool="eraser">Eraser</a>
+    </div>
+    <canvas id='tools_sketch' width='400' height='400' style='border: 2px solid black'></canvas>
+  </body>
+</html>
