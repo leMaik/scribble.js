@@ -3,7 +3,7 @@
 # **Sketch.js** is a simple jQuery plugin for creating drawable canvases
 # using HTML5 Canvas. It supports multiple browsers including mobile 
 # devices (albeit with performance penalties).
-(($)->
+sketchjs = ($) ->
   # ### jQuery('#mycanvas').sketch(options)
   #
   # Given an ID selector for a `<canvas>` element, initialize the specified
@@ -220,4 +220,9 @@
       action.color = "rgba(0,0,0,1)"
       $.sketch.tools.marker.draw.call this, action
       @context.globalCompositeOperation = oldcomposite
-)(jQuery)
+
+# ## Sketch.js module
+# 
+# **Sketch.js** is exported as a function. Simply invoke it with `jQuery` as first argument
+# to activate it.
+module.exports = sketchjs
