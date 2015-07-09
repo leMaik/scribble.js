@@ -3,7 +3,7 @@
   <head>
     <script src="http://code.jquery.com/jquery-latest.js"></script>
     <script src='../lib/sketch.js'></script>
-    <script type='text/javascript'>
+    <script type="text/javascript">
       sketchjs($);
       
       $(function() {
@@ -12,6 +12,10 @@
         });
 
         $('#tools_sketch').sketch();
+        
+        $('#printshapes').on('click', function() {
+          console.log($('#tools_sketch').sketch().getShapes());
+        });
       });
     </script>
   </head>
@@ -22,5 +26,6 @@
       <a href="#tools_sketch" data-tool="eraser">Eraser</a>
     </div>
     <canvas id='tools_sketch' width='400' height='400' style='border: 2px solid black' data-background="demo.png"></canvas>
+    <button id="printshapes">Print shapes</button>
   </body>
 </html>

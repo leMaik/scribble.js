@@ -111,7 +111,14 @@ sketchjs = ($) ->
       mime = "image/#{format}"
 
       window.open @el.toDataURL(mime)
-
+      
+    getShapes: ->
+      shapes = []
+      for action in @actions
+        if action.events?
+          shapes.push action
+      return shapes
+        
     # ### sketch.set(key, value)
     #
     # *Internal method.* Sets an arbitrary instance variable on the Sketch instance
@@ -251,6 +258,7 @@ sketchjs = ($) ->
         when 'mousedown', 'touchstart'
           @startPainting()
         when 'mouseup', 'mouseout', 'mouseleave', 'touchend', 'touchcancel'
+          @action = null
           @stopPainting()
 
       if @painting
