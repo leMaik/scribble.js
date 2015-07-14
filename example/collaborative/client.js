@@ -26,24 +26,26 @@ $(function() {
   doc.subscribe(function() {
     return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0);
   });
+  doc.on('after op', function() {
+    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0);
+  });
   return doc.whenReady(function() {
-    var old;
     if (!doc.type) {
       doc.create(json.type.name, {
         shapes: []
       });
     }
     ctx = doc.createContext();
-    old = ctx.getSnapshot();
-    return $('#simple_sketch').on('change', function() {
+    return $('#simple_sketch').on('change', function(e, newShapes, old) {
       var diff;
-      diff = jsondiff.diff(old, {
-        shapes: sketch.getShapes()
-      });
-      old = {
-        shapes: sketch.getShapes()
-      };
-      return ctx.submitOp(diff);
+      if (arguments.length >= 3) {
+        diff = jsondiff.diff({
+          shapes: old
+        }, {
+          shapes: newShapes
+        });
+        return ctx.submitOp(diff);
+      }
     });
   });
 });
@@ -2375,14 +2377,16 @@ sketchjs = function($) {
     };
 
     Sketch.prototype.stopPainting = function() {
+      var old;
+      old = this.getShapes();
       if (this.action) {
         this.actions.push(this.action);
       }
       this.redraw();
-      if (this.action) {
-        this.canvas.trigger("change", this.action);
-      }
       this.painting = false;
+      if (this.action) {
+        this.canvas.trigger("change", [this.getShapes(), old]);
+      }
       return this.action = null;
     };
 
@@ -2456,7 +2460,8 @@ sketchjs = function($) {
       }
       this.context.strokeStyle = action.color;
       this.context.lineWidth = action.size;
-      return this.context.stroke();
+      this.context.stroke();
+      return this.context.closePath();
     }
   };
   $.sketch.tools.highlighter = {
@@ -2479,6 +2484,7 @@ sketchjs = function($) {
       this.context.lineWidth = action.size;
       this.context.globalCompositeOperation = "multiply";
       this.context.stroke();
+      this.context.closePath();
       return this.context.globalCompositeOperation = "source-over";
     }
   };

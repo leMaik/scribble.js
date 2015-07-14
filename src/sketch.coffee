@@ -150,11 +150,12 @@ sketchjs = ($) ->
     #
     # *Internal method.* Called when the mouse is released or leaves the canvas.
     stopPainting: ->
+      old = @getShapes()      
       @actions.push @action if @action
       @redraw()
-      if @action
-        @canvas.trigger("change", @action)
       @painting = false
+      if @action
+        @canvas.trigger "change", [@getShapes(), old]
       @action = null
     
     # ### sketch.onEvent(e)
@@ -231,6 +232,7 @@ sketchjs = ($) ->
       @context.strokeStyle = action.color
       @context.lineWidth = action.size
       @context.stroke()
+      @context.closePath()
   
   # ## highlighter
   #
@@ -253,6 +255,7 @@ sketchjs = ($) ->
       @context.lineWidth = action.size
       @context.globalCompositeOperation = "multiply"
       @context.stroke()
+      @context.closePath()
       @context.globalCompositeOperation = "source-over"
       
   # ## eraser

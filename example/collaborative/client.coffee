@@ -16,15 +16,17 @@ $ ->
     ctx = null
     
     doc.subscribe ->
-      sketch.loadShapes(ctx?.getSnapshot().shapes);
+      sketch.loadShapes(ctx?.getSnapshot().shapes)
+      
+    doc.on 'after op', ->
+      sketch.loadShapes(ctx?.getSnapshot().shapes)
     
     doc.whenReady ->          
       if (!doc.type)
         doc.create json.type.name, { shapes: [] }
       ctx = doc.createContext()
-      old = ctx.getSnapshot()
       
-      $('#simple_sketch').on 'change', -> 
-        diff = jsondiff.diff old, { shapes: sketch.getShapes() }  
-        old = { shapes: sketch.getShapes() }  
-        ctx.submitOp diff
+      $('#simple_sketch').on 'change', (e, newShapes, old) ->
+        if arguments.length >= 3
+            diff = jsondiff.diff { shapes: old }, { shapes: newShapes }
+            ctx.submitOp diff
