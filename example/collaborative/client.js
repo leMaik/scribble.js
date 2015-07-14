@@ -28,21 +28,21 @@ $(function() {
   });
   return doc.whenReady(function() {
     var old;
-    old = {
-      shapes: []
-    };
     if (!doc.type) {
-      doc.create(json.type.name, old);
+      doc.create(json.type.name, {
+        shapes: []
+      });
     }
     ctx = doc.createContext();
+    old = ctx.getSnapshot();
     return $('#simple_sketch').on('change', function() {
-      var diff, newo;
-      newo = JSON.parse(JSON.stringify({
+      var diff;
+      diff = jsondiff.diff(old, {
         shapes: sketch.getShapes()
-      }));
-      diff = jsondiff.diff(old, newo);
-      old = newo;
-      console.log(JSON.stringify(diff));
+      });
+      old = {
+        shapes: sketch.getShapes()
+      };
       return ctx.submitOp(diff);
     });
   });

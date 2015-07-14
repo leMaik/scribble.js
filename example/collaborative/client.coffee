@@ -20,12 +20,11 @@ $ ->
     
     doc.whenReady ->          
       if (!doc.type)
-        doc.create json.type.name, old
+        doc.create json.type.name, { shapes: [] }
       ctx = doc.createContext()
-      old = (ctx.getSnapshot()
+      old = ctx.getSnapshot()
       
       $('#simple_sketch').on 'change', -> 
         diff = jsondiff.diff old, { shapes: sketch.getShapes() }  
         old = { shapes: sketch.getShapes() }  
         ctx.submitOp diff
-          
