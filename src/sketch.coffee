@@ -122,7 +122,7 @@ sketchjs = ($) ->
     loadShapes: (shapes, silent = no) ->
       @actions = shapes
       @redraw()
-      @canvas.trigger("sketch.update") if not silent
+      @canvas.trigger("change") if not silent
         
     # ### sketch.set(key, value)
     #
@@ -151,10 +151,11 @@ sketchjs = ($) ->
     # *Internal method.* Called when the mouse is released or leaves the canvas.
     stopPainting: ->
       @actions.push @action if @action
+      @redraw()
+      if @action
+        @canvas.trigger("change", @action)
       @painting = false
       @action = null
-      @redraw()
-      @canvas.trigger("sketch.update")
     
     # ### sketch.onEvent(e)
     #

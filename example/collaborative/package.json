@@ -9,16 +9,15 @@
   },
   "author": "",
   "license": "MIT",
+  "devDependencies": {
+    "express": "^4.13.1",
+    "livedb": "^0.5.12",
+    "livedb-rest": "git+https://github.com/share/rest.git",
+    "livedb-rethinkdb": "0.0.5"
+  },
   "dependencies": {
     "browserchannel": "^2.0.0",
-    "coffee-script": "^1.9.3",
-    "connect": "^3.4.0",
-    "duplex": "^1.0.0",
-    "livedb": "^0.5.12",
-    "livedb-memory-mongo": "0.0.1",
-    "optimist": "^0.6.1",
-    "serve-static": "^1.10.0",
-    "share": "^0.7.38",
-    "ws": "^0.7.2"
+    "ot-json0": "^1.0.1",
+    "share": "git+https://github.com/share/ShareJS.git"
   }
 }
