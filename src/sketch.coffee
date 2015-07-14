@@ -1,9 +1,15 @@
 # # Sketch.js (v0.0.1)
 #
 # **Sketch.js** is a simple jQuery plugin for creating drawable canvases
-# using HTML5 Canvas. It supports multiple browsers including mobile 
+# using HTML5 Canvas. It supports multiple browsers including mobile
 # devices (albeit with performance penalties).
 sketchjs = ($) ->
+  # calculates the sign of a number
+  # see: http://stackoverflow.com/questions/7624920/number-sign-in-javascript
+  sign = (x) ->
+    if typeof x == 'number' then (if x then (if x < 0 then -1 else 1) else if x == x then 0 else NaN) else NaN
+
+
   # ### jQuery('#mycanvas').sketch(options)
   #
   # Given an ID selector for a `<canvas>` element, initialize the specified
@@ -47,7 +53,7 @@ sketchjs = ($) ->
     # * `toolLinks`: If `true`, automatically turn links with href of `#mycanvas`
     #   into tool action links. See below for a description of the available
     #   tool links.
-    # * `defaultTool`: Defaults to `marker`, the tool is any of the extensible 
+    # * `defaultTool`: Defaults to `marker`, the tool is any of the extensible
     #   tools that the canvas should default to.
     # * `defaultColor`: The default drawing color. Defaults to black.
     # * `defaultSize`: The default stroke size. Defaults to 5.
@@ -111,19 +117,19 @@ sketchjs = ($) ->
       mime = "image/#{format}"
 
       window.open @el.toDataURL(mime)
-      
+
     getShapes: ->
       shapes = []
       for action in @actions
         if action.events?
           shapes.push action
       return shapes
-      
+
     loadShapes: (shapes, silent = no) ->
       @actions = shapes
       @redraw()
       @canvas.trigger("change") if not silent
-        
+      
     # ### sketch.set(key, value)
     #
     # *Internal method.* Sets an arbitrary instance variable on the Sketch instance
@@ -135,8 +141,8 @@ sketchjs = ($) ->
 
     # ### sketch.startPainting()
     #
-    # *Internal method.* Called when a mouse or touch event is triggered 
-    # that begins a paint stroke. 
+    # *Internal method.* Called when a mouse or touch event is triggered
+    # that begins a paint stroke.
     startPainting: ->
       @painting = true
       @action = {
@@ -145,6 +151,55 @@ sketchjs = ($) ->
         size: parseFloat(@size)
         events: []
       }
+
+    # calculates the [discrete] curvature of two connected line segments represented
+    # by their points p1-p2-p3 where (p1,p2) is the first line segment and (p2,p3) the second
+    calculateCurvature: (p1,p2,p3) ->
+      # Idea from http://page.math.tu-berlin.de/~bobenko/Lehre/Skripte/KuF.pdf page 22
+      # r1: direction of segment p1->p2
+      # r2: direction of segmet p3->p2
+      r1 = {x: p2.x-p1.x, y: p2.y-p1.y}
+      r2 = {x: p2.x-p3.x, y: p2.y-p3.y}
+
+      crossZ = r1.x * r2.y - r2.x * r1.y
+      if crossZ == 0 then crossZ = 1
+
+      # phi: angle of the two line segmets
+      # k: curvature
+      phi = sign(crossZ) * Math.acos((r1.x*r2.x+r1.y*r2.y) / ( Math.sqrt(r1.x*r1.x+r1.y*r1.y) * Math.sqrt(r2.x*r2.x+r2.y*r2.y) ))
+      k = 2 / Math.tan(phi / 2)
+
+      ###
+      k is always positive, as acos maps to 0 to pi, but it is important to also consider
+      negative phi's. On a Line all curvature fluctations should nearly cancel themselves out
+      the sign can be calculated using the cross product where the direction of the
+      z component determines the sign
+                   |       0        |
+          a x b =  |       0        |  => sign ( ax by - bx ay)
+                   | ax by - bx ay  |
+      ###
+
+      return k
+
+    optimize: (action) ->
+      curvatureThreshold = 0.08
+      path = action.events
+      newPath = [path[0]]
+      last = 0;
+      for i in [0...path.length-2]
+        k = @calculateCurvature path[last], path[i], path[i+1]
+
+        if Math.abs(k)>curvatureThreshold
+          last = i
+          newPath.push path[i]
+
+      newPath.push path[path.length-1]
+
+      #console.log("optimizedPath\n points before opzimization: " + path.length + "\n points after opzimization: " + newPath.length);
+      action.events = newPath
+      return action;
+
+      return action
 
     # ### sketch.stopPainting()
     #
@@ -157,10 +212,10 @@ sketchjs = ($) ->
       if @action
         @canvas.trigger "change", [@getShapes(), old]
       @action = null
-    
+      
     # ### sketch.onEvent(e)
     #
-    # *Internal method.* Universal event handler for the canvas. Any mouse or 
+    # *Internal method.* Universal event handler for the canvas. Any mouse or
     # touch related events are passed through this handler before being passed
     # on to the individual tools.
     onEvent: (e)->
@@ -179,10 +234,10 @@ sketchjs = ($) ->
     redraw: ->
       @el.width = @canvas.width()
       @context = @el.getContext '2d'
-      
+
       if @background?
         @context.drawImage @background, 0, 0
-      
+
       sketch = this
       $.each @actions, ->
         if this.tool
@@ -199,7 +254,7 @@ sketchjs = ($) ->
   #
   # Tools can be added simply by adding a new key to the `$.sketch.tools` object.
   $.sketch = { tools: {} }
-  
+
   # ## marker
   #
   # The marker is the most basic drawing tool. It will draw a stroke of the current
@@ -223,7 +278,7 @@ sketchjs = ($) ->
       @context.lineJoin = "round"
       @context.lineCap = "round"
       @context.beginPath()
-      
+
       @context.moveTo action.events[0].x, action.events[0].y
       for event in action.events
         @context.lineTo event.x, event.y
@@ -245,7 +300,7 @@ sketchjs = ($) ->
       @context.lineJoin = "round"
       @context.lineCap = "round"
       @context.beginPath()
-      
+
       @context.moveTo action.events[0].x, action.events[0].y
       for event in action.events
         @context.lineTo event.x, event.y
@@ -257,7 +312,7 @@ sketchjs = ($) ->
       @context.stroke()
       @context.closePath()
       @context.globalCompositeOperation = "source-over"
-      
+
   # ## eraser
   #
   # The eraser does just what you'd expect: removes any of the existing sketch.
@@ -277,7 +332,7 @@ sketchjs = ($) ->
           event: e.type
 
         inRadius = (p1, p2, r = 10) -> Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r
-        
+
         newActions = []
         for otherAction in @actions
           remove = no
@@ -286,17 +341,17 @@ sketchjs = ($) ->
               if inRadius(location, event)
                 remove = yes
                 break
-          
+
           if not remove
             newActions.push otherAction
-            
+
         @actions = newActions
         @redraw()
-      
+
     draw: (action) ->
 
 # ## Sketch.js module
-# 
+#
 # **Sketch.js** is exported as a function. Simply invoke it with `jQuery` as first argument
 # to activate it.
 module.exports = sketchjs
