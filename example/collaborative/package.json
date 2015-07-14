@@ -11,6 +11,7 @@
   "license": "MIT",
   "devDependencies": {
     "express": "^4.13.1",
+    "jsondiff-share-ops": "0.0.1",
     "livedb": "^0.5.12",
     "livedb-rest": "git+https://github.com/share/rest.git",
     "livedb-rethinkdb": "0.0.5"
@@ -18,6 +19,6 @@
   "dependencies": {
     "browserchannel": "^2.0.0",
     "ot-json0": "^1.0.1",
-    "share": "git+https://github.com/share/ShareJS.git"
+    "share": "0.7.3"
   }
 }

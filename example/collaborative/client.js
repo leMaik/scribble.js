@@ -1,5 +1,5 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.sketchjs = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var BCSocket, json, sketchjs;
+var BCSocket, json, jsondiff, sketchjs;
 
 sketchjs = require('../../lib/sketch');
 
@@ -9,8 +9,10 @@ sketchjs($);
 
 json = require('ot-json0');
 
+jsondiff = require('jsondiff-share-ops');
+
 $(function() {
-  var doc, getUrlParameter, sjs, sketch, socket;
+  var ctx, doc, getUrlParameter, sjs, sketch, socket;
   sketch = $('#simple_sketch').sketch().sketch();
   getUrlParameter = function(name) {
     return (new RegExp(name + '=' + '(.+?)(&|$)').exec(window.location.search) || [null])[1];
@@ -20,33 +22,34 @@ $(function() {
   });
   sjs = new sharejs.Connection(socket);
   doc = sjs.get('bla', 'blubbs2');
-  doc.subscribe();
+  ctx = null;
+  doc.subscribe(function() {
+    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0);
+  });
   return doc.whenReady(function() {
-    var ctx;
+    var old;
+    old = {
+      shapes: []
+    };
     if (!doc.type) {
-      doc.create(json.type.name, []);
+      doc.create(json.type.name, old);
     }
     ctx = doc.createContext();
-    doc.on('after op', function() {
-      console.log(ctx.get());
-      return sketch.loadShapes(JSON.parse(ctx.get()));
-    });
-    return $('#simple_sketch').on('change', function(e) {
-      if ((e != null) && (e.data != null)) {
-        console.log(e.data);
-        return ctx.submitOp(doc.type.append({}, [
-          {
-            p: {},
-            li: e.data
-          }
-        ]));
-      }
+    return $('#simple_sketch').on('change', function() {
+      var diff, newo;
+      newo = JSON.parse(JSON.stringify({
+        shapes: sketch.getShapes()
+      }));
+      diff = jsondiff.diff(old, newo);
+      old = newo;
+      console.log(JSON.stringify(diff));
+      return ctx.submitOp(diff);
     });
   });
 });
 
 
-},{"../../lib/sketch":7,"./node_modules/browserchannel/dist/bcsocket":2,"ot-json0":4}],2:[function(require,module,exports){
+},{"../../lib/sketch":10,"./node_modules/browserchannel/dist/bcsocket":2,"jsondiff-share-ops":3,"ot-json0":7}],2:[function(require,module,exports){
 (function(){
 var f,aa=aa||{},l=this;function ba(a){a=a.split(".");for(var b=l,c;c=a.shift();)if(null!=b[c])b=b[c];else return null;return b}function ca(){}
 function da(a){var b=typeof a;if("object"==b)if(a){if(a instanceof Array)return"array";if(a instanceof Object)return b;var c=Object.prototype.toString.call(a);if("[object Window]"==c)return"object";if("[object Array]"==c||"number"==typeof a.length&&"undefined"!=typeof a.splice&&"undefined"!=typeof a.propertyIsEnumerable&&!a.propertyIsEnumerable("splice"))return"array";if("[object Function]"==c||"undefined"!=typeof a.call&&"undefined"!=typeof a.propertyIsEnumerable&&!a.propertyIsEnumerable("call"))return"function"}else return"null";
@@ -150,6 +153,1080 @@ e=function(a,b,c,d,e){try{return"function"===typeof r[a]?r[a](c,d,e):void 0}catc
 })();
 
 },{}],3:[function(require,module,exports){
+module.exports = require('./lib/jsondiff-share-ops');
+},{"./lib/jsondiff-share-ops":4}],4:[function(require,module,exports){
+/*!
+ * jsondiff-share-ops - lib/jsondiff-share-ops.js
+ * Copyright(c) 2013 Adrian Geana <geana.adrian@gmail.com>
+ * MIT Licensed
+ */
+
+var jsondiffOps = (function() {
+	"use strict";
+
+	var jsondiff = require('jsondiffpatch');
+	jsondiff.config.hashObject = function(obj) {
+		return JSON.stringify(obj);
+	};
+
+	var options = {
+		// TODO
+	};
+
+	function isArrayType(obj) {
+		return obj instanceof Array;
+	}
+
+	function replaceOp(path, oldObj, newObj, isArray) {
+		return isArray ? {
+				p: path,
+				ld: oldObj,
+				li: newObj
+			} : {
+				p: path,
+				od: oldObj,
+				oi: newObj
+			};
+	}
+
+	function insertOp(path, obj, isArray) {
+		return isArray ? {
+				p: path,
+				li: obj
+			} : {
+				p: path,
+				oi: obj
+			};
+		}
+
+	function removeOp(path, obj, isArray) {
+		return isArray ? {
+				p: path,
+				ld: obj
+			} : {
+				p: path,
+				od: obj
+			};
+	}
+
+	function moveOp(path, index) {
+		return {
+			p: path,
+			lm: index
+		};
+	}
+
+	function getDelta(a, b) {
+		return jsondiff.diff(a, b) || {};
+	}
+
+	function opsFromDelta(delta, path, isArray) {
+		path = path || [];
+		isArray = isArray || false;
+
+		if(isArrayType(delta)) {
+			// insert operation
+			if(delta.length == 1) {
+				return insertOp(path, delta[0], isArray);
+			}
+			// replace operation
+			if(delta.length == 2) {
+				return replaceOp(path, delta[0], delta[1], isArray);
+			}
+			// remove / move / text diff operation
+			if(delta.length == 3) {
+				// last item in array tells us the operation type
+				switch(delta[2]) {
+					// item removed
+					case 0:
+						return removeOp(path, delta[0], isArray);
+					// text diff
+					case 2:
+						// TODO
+					break;
+					// item moved
+					case 3:
+						return moveOp(path, delta[1]);
+				}
+			}
+		} else {
+			var ops = [],
+				nodeIsArray = (delta._t === 'a'),
+				processedKeys = [];
+
+			var keys = Object.keys(delta).sort(),
+				key,
+				op,
+				idx;
+
+			for(var i = 0; i < keys.length; i++) {
+				key = keys[i];
+				// ignore type key
+				if(key == '_t' &&  delta[key] === 'a') continue;
+				//ignore processed keys
+				if(processedKeys.indexOf(key) !== -1) continue;
+
+				if(nodeIsArray && key.indexOf('_') >= 0) {
+					idx = parseInt(key.replace('_', ''), 10);
+					op = opsFromDelta(delta[key], path.concat(idx), nodeIsArray);
+					ops = ops.concat(op);
+				} else {
+					idx = nodeIsArray ? parseInt(key, 10) : key;
+					op = opsFromDelta(delta[key], path.concat(idx), nodeIsArray);
+					// we have another operation for same item (with the '_' prefix)
+					// if we're having a insert and a delete op we'll compose them
+					if(nodeIsArray && op.li !== undefined && delta['_' + key] !== undefined) {
+						var op2 = opsFromDelta(delta['_' + key], path.concat(idx), nodeIsArray);
+						// mark the other key as processed
+						processedKeys.push('_' + key);
+						if(op2.ld !== undefined && op2.li === undefined) {
+							op = replaceOp(op.p, op2.ld, op.li, nodeIsArray);
+							ops.push(op);
+						} else {
+							// it's not a replace operation
+							ops.push(op, op2);
+						}
+					} else {
+						ops = ops.concat(op);
+					}
+				}
+				processedKeys.push(key);
+			}
+
+			var retOps = [];
+			// go through list replace operation to try finding deeper level diffs
+			for(var i = 0; i < ops.length; i++) {
+				op = ops[i];
+				if(op.li && op.ld) {
+					retOps = retOps.concat(opsFromDelta(getDelta(op.ld, op.li), op.p, true));
+					continue;
+				}
+				retOps.push(op)
+			}
+			return retOps;
+		}
+		return [];
+	}
+
+	return  {
+		diff: function(a, b, opts) {
+			opts = opts || {};
+			// apply options
+			for(var key in opts) {
+				if(options[key]) {
+					options[key] = opts[key];
+				}
+			}
+			var delta = getDelta(a, b);
+			return [].concat(opsFromDelta(delta));
+		}
+	};
+
+})();
+
+module.exports = jsondiffOps;
+
+},{"jsondiffpatch":5}],5:[function(require,module,exports){
+/*
+*   Json Diff Patch
+*   ---------------
+*   https://github.com/benjamine/JsonDiffPatch
+*   by Benjamin Eidelman - beneidel@gmail.com
+*/
+(function(){
+"use strict";
+
+    var jdp = {};
+    if (typeof jsondiffpatch != 'undefined'){
+        jdp = jsondiffpatch;
+    }
+    var jsondiffpatch = jdp;
+    jdp.version = '0.0.11';
+    jdp.config = {
+        textDiffMinLength: 60,
+        detectArrayMove: true,
+        includeValueOnArrayMove: false
+    };
+
+    var arrayIndexOf = typeof Array.prototype.indexOf === 'function' ?
+        function(array, item) {
+            return array.indexOf(item);
+        } : function(array, item) {
+            var length = array.length;
+            for (var i = 0; i < length; i++) {
+                if (array[i] === item) {
+                    return i;
+                }
+            }
+            return -1;
+        };
+
+    var sequenceDiffer = {
+
+        diff: function(array1, array2, objectHash, objectInnerDiff) {
+            var commonHead = 0, commonTail = 0, index, index1;
+            var len1 = array1.length;
+            var len2 = array2.length;
+            var diff;
+            var hashCache1 = [];
+            var hashCache2 = [];
+            var areTheSame = typeof objectHash == 'function' ?
+                function(value1, value2, index1, index2) {
+                    if (value1 === value2)
+                        return true;
+                    if (typeof value1 != 'object' || typeof value2 != 'object')
+                        return false;
+                    var hash1, hash2;
+                    if (typeof index1 == 'number') {
+                        hash1 =  hashCache1[index1];
+                        if (typeof hash1 == 'undefined') {
+                            hashCache1[index1] = hash1 = objectHash(value1);
+                        }
+                    } else {
+                        hash1 = objectHash(value1);
+                    }
+                    if (typeof index2 == 'number') {
+                        hash2 =  hashCache2[index2];
+                        if (typeof hash2 == 'undefined') {
+                            hashCache2[index2] = hash2 = objectHash(value2);
+                        }
+                    } else {
+                        hash2 = objectHash(value2);
+                    }
+                    return hash1 === hash2;
+                } :
+                function(value1, value2) {
+                    return value1 === value2;
+                };
+            var areTheSameByIndex = function(index1, index2) {
+                return areTheSame(array1[index1], array2[index2], index1, index2);
+            };
+
+            var tryObjectInnerDiff = function(index1, index2) {
+                if (!objectInnerDiff) {
+                    return;
+                }
+                if (typeof array1[index1] != 'object' || typeof array2[index2] != 'object') {
+                    return;
+                }
+                var result = objectInnerDiff(array1[index1], array2[index2]);
+                if (typeof result == 'undefined') {
+                    return;
+                }
+                if (!diff) {
+                    diff = { _t: 'a' };
+                }
+                diff[index2] = result;
+            };
+
+            // separate common head
+            while (commonHead < len1 && commonHead < len2 &&
+                areTheSameByIndex(commonHead, commonHead)) {
+                tryObjectInnerDiff(commonHead, commonHead);
+                commonHead++;
+            }
+            // separate common tail
+            while (commonTail + commonHead < len1 && commonTail + commonHead < len2 &&
+                areTheSameByIndex(len1 - 1 - commonTail, len2 - 1 - commonTail)) {
+                tryObjectInnerDiff(len1 - 1 - commonTail, len2 - 1 - commonTail);
+                commonTail++;
+            }
+
+            if (commonHead + commonTail === len1) {
+                if (len1 === len2) {
+                    // arrays are identical
+                    return diff;
+                }
+                // trivial case, a block (1 or more) was added at array2
+                diff = diff || { _t: 'a' };
+                for (index = commonHead; index < len2 - commonTail; index++) {
+                    diff[index] = [array2[index]];
+                }
+                return diff;
+            } else if (commonHead + commonTail === len2) {
+                // trivial case, a block (1 or more) was removed from array1
+                diff = diff || { _t: 'a' };
+                for (index = commonHead; index < len1 - commonTail; index++) {
+                    diff['_'+index] = [array1[index], 0, 0];
+                }
+                return diff;
+            }
+
+            // diff is not trivial, find the LCS (Longest Common Subsequence)
+            var lcs = this.lcs(
+                array1.slice(commonHead, len1 - commonTail),
+                array2.slice(commonHead, len2  - commonTail),
+                {
+                    areTheSameByIndex: function(index1, index2) {
+                        return areTheSameByIndex(index1 + commonHead, index2 + commonHead);
+                    }
+                });
+
+            diff = diff || { _t: 'a' };
+
+            var removedItems = [];
+            for (index = commonHead; index < len1 - commonTail; index++) {
+                if (arrayIndexOf(lcs.indices1, index - commonHead) < 0) {
+                    // removed
+                    diff['_'+index] = [array1[index], 0, 0];
+                    removedItems.push(index);
+                }
+            }
+            var removedItemsLength = removedItems.length;
+            for (index = commonHead; index < len2 - commonTail; index++) {
+                var indexOnArray2 = arrayIndexOf(lcs.indices2, index - commonHead);
+                if (indexOnArray2 < 0) {
+                    // added, try to match with a removed item and register as position move
+                    var isMove = false;
+                    if (jdp.config.detectArrayMove) {
+                        if (removedItemsLength > 0) {
+                            for (index1 = 0; index1 < removedItemsLength; index1++) {
+                                if (areTheSameByIndex(removedItems[index1], index)) {
+                                    // store position move as: [originalValue, newPosition, 3]
+                                    diff['_' + removedItems[index1]].splice(1, 2, index, 3);
+                                    if (!jdp.config.includeValueOnArrayMove) {
+                                        // don't include moved value on diff, to save bytes
+                                        diff['_' + removedItems[index1]][0] = '';
+                                    }
+                                    tryObjectInnerDiff(removedItems[index1], index);
+                                    removedItems.splice(index1, 1);
+                                    isMove = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!isMove) {
+                        // added
+                        diff[index] = [array2[index]];
+                    }
+                } else {
+                    // match, do inner diff
+                    tryObjectInnerDiff(lcs.indices1[indexOnArray2] + commonHead, lcs.indices2[indexOnArray2] + commonHead);
+                }
+            }
+
+            return diff;
+        },
+
+        getArrayIndexBefore: function(d, indexAfter) {
+            var index, indexBefore = indexAfter;
+            for (var prop in d) {
+                if (d.hasOwnProperty(prop)) {
+                    if (isArray(d[prop])) {
+                        if (prop.slice(0, 1) === '_') {
+                            index = parseInt(prop.slice(1), 10);
+                        } else {
+                            index = parseInt(prop, 10);
+                        }
+                        if (d[prop].length === 1) {
+                            if (index < indexAfter) {
+                                // this item was inserted before
+                                indexBefore--;
+                            } else {
+                                if (index === indexAfter) {
+                                    // the item is new
+                                    return -1;
+                                }
+                            }
+                        } else if (d[prop].length === 3) {
+                            if (d[prop][2] === 0) {
+                                if (index <= indexAfter) {
+                                    // this item was removed before
+                                    indexBefore++;
+                                }
+                            } else {
+                                if (d[prop][2] === 3) {
+                                    if (index <= indexAfter) {
+                                        // this item was moved from a position before
+                                        indexBefore++;
+                                    }
+                                    if (d[prop][1] > indexAfter) {
+                                        // this item was moved to a position before
+                                        indexBefore--;
+                                    } else {
+                                        if (d[prop][1] === indexAfter) {
+                                            // the items was moved from other position
+                                            return index;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return indexBefore;
+        },
+
+        patch: function(array, d, objectInnerPatch, path) {
+            var index, index1;
+            var numerically = function(a, b) {
+                return a - b;
+            };
+            var numericallyBy = function(name) {
+                return function(a, b) {
+                    return a[name] - b[name];
+                };
+            };
+
+            // first, separate removals, insertions and modifications
+            var toRemove = [];
+            var toInsert = [];
+            var toModify = [];
+            for (index in d) {
+                if (index !== '_t') {
+                    if (index[0] == '_') {
+                        // removed item from original array
+                        if (d[index][2] === 0 || d[index][2] === 3) {
+                            toRemove.push(parseInt(index.slice(1), 10));
+                        } else {
+                            throw new Error('only removal or move can be applied at original array indices, invalid diff type: ' + d[index][2]);
+                        }
+                    } else {
+                        if (d[index].length === 1) {
+                            // added item at new array
+                            toInsert.push({
+                                index: parseInt(index, 10),
+                                value: d[index][0]
+                            });
+                        } else {
+                            // modified item at new array
+                            toModify.push({
+                                index: parseInt(index, 10),
+                                diff: d[index]
+                            });
+                        }
+                    }
+                }
+            }
+
+            // remove items, in reverse order to avoid sawing our own floor
+            toRemove = toRemove.sort(numerically);
+            for (index = toRemove.length - 1; index >= 0; index--) {
+                index1 = toRemove[index];
+                var indexDiff = d['_' + index1];
+                var removedValue = array.splice(index1, 1)[0];
+                if (indexDiff[2] === 3) {
+                    // reinsert later
+                    toInsert.push({
+                        index: indexDiff[1],
+                        value: removedValue
+                    });
+                }
+            }
+
+            // insert items, in reverse order to avoid moving our own floor
+            toInsert = toInsert.sort(numericallyBy('index'));
+            var toInsertLength = toInsert.length;
+            for (index = 0; index < toInsertLength; index++) {
+                var insertion = toInsert[index];
+                array.splice(insertion.index, 0, insertion.value);
+            }
+
+            // apply modifications
+            var toModifyLength = toModify.length;
+            if (toModifyLength > 0) {
+                if (typeof objectInnerPatch != 'function') {
+                    throw new Error('to patch items in the array an objectInnerPatch function must be provided');
+                }
+                for (index = 0; index < toModifyLength; index++) {
+                    var modification = toModify[index];
+                    objectInnerPatch(array, modification.index.toString(), modification.diff, path);
+                }
+            }
+
+            return array;
+        },
+
+        lcs: function(array1, array2, options) {
+
+            // http://en.wikipedia.org/wiki/Longest_common_subsequence_problem
+            options.areTheSameByIndex = options.areTheSameByIndex || function(index1, index2) {
+                return array1[index1] === array2[index2];
+            };
+            var matrix = this.lengthMatrix(array1, array2, options);
+            var result = this.backtrack(matrix, array1, array2, array1.length, array2.length);
+            if (typeof array1 == 'string' && typeof array2 == 'string') {
+                result.sequence = result.sequence.join('');
+            }
+            return result;
+        },
+
+        lengthMatrix: function(array1, array2, options) {
+            var len1 = array1.length;
+            var len2 = array2.length;
+            var x, y;
+
+            // initialize empty matrix of len1+1 x len2+1
+            var matrix = [len1 + 1];
+            for (x = 0; x < len1 + 1; x++) {
+                matrix[x] = [len2 + 1];
+                for (y = 0; y < len2 + 1; y++) {
+                    matrix[x][y] = 0;
+                }
+            }
+            matrix.options = options;
+            // save sequence lengths for each coordinate
+            for (x = 1; x < len1 + 1; x++) {
+                for (y = 1; y < len2 + 1; y++) {
+                    if (options.areTheSameByIndex(x - 1, y - 1)) {
+                        matrix[x][y] = matrix[x - 1][y - 1] + 1;
+                    } else {
+                        matrix[x][y] = Math.max(matrix[x - 1][y], matrix[x][y - 1]);
+                    }
+                }
+            }
+            return matrix;
+        },
+
+        backtrack: function(lenghtMatrix, array1, array2, index1, index2) {
+            if (index1 === 0 || index2 === 0) {
+                return {
+                    sequence: [],
+                    indices1: [],
+                    indices2: []
+                };
+            }
+
+            if (lenghtMatrix.options.areTheSameByIndex(index1 - 1, index2 - 1)) {
+                var subsequence = this.backtrack(lenghtMatrix, array1, array2, index1 - 1, index2 - 1);
+                subsequence.sequence.push(array1[index1 - 1]);
+                subsequence.indices1.push(index1 - 1);
+                subsequence.indices2.push(index2 - 1);
+                return subsequence;
+            }
+
+            if (lenghtMatrix[index1][index2 - 1] > lenghtMatrix[index1 - 1][index2]) {
+                return this.backtrack(lenghtMatrix, array1, array2, index1, index2 - 1);
+            } else {
+                return this.backtrack(lenghtMatrix, array1, array2, index1 - 1, index2);
+            }
+        }
+    };
+
+    jdp.sequenceDiffer = sequenceDiffer;
+
+    jdp.dateReviver = function(key, value){
+        var a;
+        if (typeof value === 'string') {
+            a = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)(Z|([+\-])(\d{2}):(\d{2}))$/.exec(value);
+            if (a) {
+                return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4], +a[5], +a[6]));
+            }
+        }
+        return value;
+    };
+
+    var diff_match_patch_autoconfig = function(){
+        var dmp;
+
+        if (jdp.config.diff_match_patch) {
+            dmp = new jdp.config.diff_match_patch.diff_match_patch();
+        }
+        if (typeof diff_match_patch != 'undefined') {
+            if (typeof diff_match_patch == 'function') {
+                /* jshint newcap: false */
+                dmp = new diff_match_patch();
+                /* jshint newcap: true */
+            }
+            else if (typeof diff_match_patch == 'object' && typeof diff_match_patch.diff_match_patch == 'function') {
+                dmp = new diff_match_patch.diff_match_patch();
+            }
+        }
+
+        if (dmp) {
+            jdp.config.textDiff = function(txt1, txt2){
+                return dmp.patch_toText(dmp.patch_make(txt1, txt2));
+            };
+            jdp.config.textPatch = function(txt1, patch){
+                var results = dmp.patch_apply(dmp.patch_fromText(patch), txt1);
+                for (var i = 0; i < results[1].length; i++) {
+                    if (!results[1][i]) {
+                        throw new Error('text patch failed');
+                    }
+                }
+                return results[0];
+            };
+            return true;
+        }
+    };
+
+    var isArray = jdp.isArray = (typeof Array.isArray == 'function') ?
+        // use native function
+        Array.isArray :
+        // use instanceof operator
+        function(a) {
+            return typeof a == 'object' && a instanceof Array;
+        };
+
+    var isDate = jdp.isDate = function(d){
+        return d instanceof Date || Object.prototype.toString.call(d) === '[object Date]';
+    };
+
+    var arrayDiff = function(o, n){
+        return sequenceDiffer.diff(o, n, jdp.config.objectHash, jdp.diff);
+    };
+
+    var objectDiff = function(o, n){
+
+        var odiff, pdiff, prop, addPropDiff;
+
+        addPropDiff = function(name){
+
+            pdiff = diff(o[name], n[name]);
+            if (typeof pdiff != 'undefined') {
+                if (typeof odiff == 'undefined') {
+                    odiff = {};
+                }
+                odiff[name] = pdiff;
+            }
+        };
+
+        for (prop in n) {
+            if (n.hasOwnProperty(prop)) {
+                addPropDiff(prop);
+            }
+        }
+        for (prop in o) {
+            if (o.hasOwnProperty(prop)) {
+                if (typeof n[prop] == 'undefined') {
+                    addPropDiff(prop);
+                }
+            }
+        }
+        return odiff;
+    };
+
+    var diff = jdp.diff = function(o, n){
+        var ntype, otype, nnull, onull, d;
+
+        if (o === n) {
+            return;
+        }
+        if ((o !== o) && (n !== n)) {
+            return; // o and n are both NaN
+        }
+        ntype = typeof n;
+        otype = typeof o;
+        nnull = n === null;
+        onull = o === null;
+
+        // handle Date objects
+        if (otype == 'object' && isDate(o)){
+            otype = 'date';
+        }
+        if (ntype == 'object' && isDate(n)){
+            ntype = 'date';
+            if (otype == 'date'){
+                // check if equal dates
+                if (o.getTime() === n.getTime()){
+                    return;
+                }
+            }
+        }
+
+        if (nnull || onull || ntype == 'undefined' || ntype != otype ||
+        ntype == 'number' ||
+        otype == 'number' ||
+        ntype == 'boolean' ||
+        otype == 'boolean' ||
+        ntype == 'string' ||
+        otype == 'string' ||
+        ntype == 'date' ||
+        otype == 'date' ||
+        ((ntype === 'object') && (isArray(n) != isArray(o)))) {
+            // value changed
+            d = [];
+            if (typeof o != 'undefined') {
+                if (typeof n != 'undefined') {
+                    var longText = (ntype == 'string' && otype == 'string' && Math.min(o.length, n.length) > jdp.config.textDiffMinLength);
+                    if (longText && !jdp.config.textDiff) {
+                        diff_match_patch_autoconfig();
+                    }
+                    if (longText && jdp.config.textDiff) {
+                        // get changes form old value to new value as a text diff
+                        d.push(jdp.config.textDiff(o, n), 0, 2);
+                    }
+                    else {
+                        // old value changed to new value
+                        d.push(o);
+                        d.push(n);
+                    }
+                }
+                else {
+                    // old value has been removed
+                    d.push(o);
+                    d.push(0, 0);
+                }
+            }
+            else {
+                // new value is added
+                d.push(n);
+            }
+            return d;
+        }
+        else {
+            if (isArray(n)) {
+                // diff 2 arrays
+                return arrayDiff(o, n);
+            }
+            else {
+                // diff 2 objects
+                return objectDiff(o, n);
+            }
+        }
+    };
+
+    var objectGet = function(obj, key){
+        if (isArray(obj)) {
+            return obj[parseInt(key, 10)];
+        }
+        return obj[key];
+    };
+
+    jdp.getByKey = objectGet;
+
+    var objectSet = function(obj, key, value){
+        if (isArray(obj) && obj._key) {
+            var getKey = obj._key;
+            if (typeof obj._key != 'function') {
+                getKey = function(item){
+                    return item[obj._key];
+                };
+            }
+            for (var i = 0; i < obj.length; i++) {
+                if (getKey(obj[i]) === key) {
+                    if (typeof value == 'undefined') {
+                        obj.splice(i, 1);
+                        i--;
+                    }
+                    else {
+                        obj[i] = value;
+                    }
+                    return;
+                }
+            }
+            if (typeof value != 'undefined') {
+                obj.push(value);
+            }
+            return;
+        }
+        if (typeof value == 'undefined') {
+            if (isArray(obj)) {
+                obj.splice(key, 1);
+            } else {
+                delete obj[key];
+            }
+        }
+        else {
+            obj[key] = value;
+        }
+    };
+
+    var textDiffReverse = function(td){
+
+        if (!jdp.config.textDiffReverse){
+            jdp.config.textDiffReverse = function(d){
+
+                var i, l, lines, line, lineTmp, header = null, headerRegex = /^@@ +\-(\d+),(\d+) +\+(\d+),(\d+) +@@$/, lineHeader, lineAdd, lineRemove;
+
+                var diffSwap = function() {
+                    // swap
+                    if (lineAdd !== null) {
+                        lines[lineAdd] = '-' + lines[lineAdd].slice(1);
+                    }
+                    if (lineRemove !== null) {
+                        lines[lineRemove] = '+' + lines[lineRemove].slice(1);
+                        if (lineAdd !== null) {
+                            lineTmp = lines[lineAdd];
+                            lines[lineAdd] = lines[lineRemove];
+                            lines[lineRemove] = lineTmp;
+                        }
+                    }
+
+                    // fix header
+                    lines[lineHeader] = '@@ -' + header[3] + ',' + header[4] + ' +' + header[1] + ',' + header[2] + ' @@';
+
+                    header = null;
+                    lineHeader = null;
+                    lineAdd = null;
+                    lineRemove = null;
+                };
+
+                lines = d.split('\n');
+                for (i = 0, l = lines.length; i<l; i++) {
+                    line = lines[i];
+                    var lineStart = line.slice(0,1);
+                    if (lineStart==='@'){
+                        if (header !== null) {
+                            //diffSwap();
+                        }
+                        header = headerRegex.exec(line);
+                        lineHeader = i;
+                        lineAdd = null;
+                        lineRemove = null;
+
+                        // fix header
+                        lines[lineHeader] = '@@ -' + header[3] + ',' + header[4] + ' +' + header[1] + ',' + header[2] + ' @@';
+                    } else if (lineStart == '+'){
+                        lineAdd = i;
+                        lines[i] = '-' + lines[i].slice(1);
+                    } else if (lineStart == '-'){
+                        lineRemove = i;
+                        lines[i] = '+' + lines[i].slice(1);
+                    }
+                }
+                if (header !== null) {
+                    //diffSwap();
+                }
+                return lines.join('\n');
+            };
+        }
+        return jdp.config.textDiffReverse(td);
+    };
+
+    var reverse = jdp.reverse = function(d){
+
+        var prop, rd;
+
+        if (typeof d == 'undefined')
+        {
+            return;
+        }
+        else if (d === null)
+        {
+            return null;
+        }
+        else if (typeof d == 'object' && !isDate(d))
+        {
+            if (isArray(d))
+            {
+                if (d.length < 3)
+                {
+                    if (d.length === 1) {
+                        // add => delete
+                        return [d[0], 0, 0];
+                    } else {
+                        // modify => reverse modify
+                        return [d[1], d[0]];
+                    }
+                }
+                else
+                {
+                    if (d[2] === 0)
+                    {
+                        // undefined, delete value => add value
+                        return [d[0]];
+                    }
+                    else
+                    {
+                        if (d[2] === 2) {
+                            return [textDiffReverse(d[0]), 0, 2];
+                        }
+                        else
+                        {
+                            throw new Error("invalid diff type");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                rd = {};
+                if (d._t === 'a') {
+                    for (prop in d) {
+                        if (d.hasOwnProperty(prop) && prop !== '_t') {
+                            var index, reverseProp = prop;
+                            if (prop.slice(0, 1) === '_') {
+                                index = parseInt(prop.slice(1), 10);
+                            } else {
+                                index = parseInt(prop, 10);
+                            }
+                            if (isArray(d[prop])) {
+                                if (d[prop].length === 1) {
+                                    // add => delete
+                                    reverseProp = '_' + index;
+                                } else {
+                                    if (d[prop].length === 2) {
+                                        // modify => reverse modify
+                                        reverseProp = sequenceDiffer.getArrayIndexBefore(d, index);
+                                    } else {
+                                        if (d[prop][2] === 0) {
+                                            // delete => add
+                                            reverseProp = index.toString();
+                                        } else {
+                                            if (d[prop][2] === 3) {
+                                                // move => reverse move
+                                                reverseProp = '_' + d[prop][1];
+                                                rd[reverseProp] = [d[prop][0], index, 3];
+                                                continue;
+                                            } else {
+                                                // other modify (eg. textDiff) => reverse modify
+                                                reverseProp = sequenceDiffer.getArrayIndexBefore(d, index);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // inner diff => reverse inner diff
+                                reverseProp = sequenceDiffer.getArrayIndexBefore(d, index);
+                            }
+                            rd[reverseProp] = reverse(d[prop]);
+                        }
+                    }
+                    rd._t = 'a';
+                } else {
+                    for (prop in d) {
+                        if (d.hasOwnProperty(prop)) {
+                            rd[prop] = reverse(d[prop]);
+                        }
+                    }
+                }
+                return rd;
+            }
+        } else if (typeof d === 'string' && d.slice(0,2) === '@@'){
+            return textDiffReverse(d);
+        }
+        return d;
+    };
+
+    var patch = jdp.patch = function(o, pname, d, path) {
+
+        var p, nvalue, subpath = '', target;
+
+        if (typeof pname != 'string') {
+            path = d;
+            d = pname;
+            pname = null;
+        }
+        else {
+            if (typeof o != 'object') {
+                pname = null;
+            }
+        }
+
+        if (path) {
+            subpath += path;
+        }
+        subpath += '/';
+        if (pname !== null) {
+            subpath += pname;
+        }
+
+        if (typeof d == 'object') {
+            if (isArray(d)) {
+                // changed value
+                if (d.length < 3) {
+                    nvalue = d[d.length - 1];
+                    if (pname !== null) {
+                        objectSet(o, pname, nvalue);
+                    }
+                    return nvalue;
+                }
+                else {
+                    if (d[2] === 0) {
+                        // undefined, delete value
+                        if (pname !== null) {
+                            objectSet(o, pname);
+                        }
+                        else {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (d[2] === 2) {
+                            // text diff
+                            if (!jdp.config.textPatch) {
+                                diff_match_patch_autoconfig();
+                            }
+                            if (!jdp.config.textPatch) {
+                                throw new Error("textPatch function not found");
+                            }
+                            try {
+                                nvalue = jdp.config.textPatch(objectGet(o, pname), d[0]);
+                            }
+                            catch (text_patch_err) {
+                                throw new Error('cannot apply patch at "' + subpath + '": ' + text_patch_err);
+                            }
+                            if (pname !== null) {
+                                objectSet(o, pname, nvalue);
+                            }
+                            return nvalue;
+                        }
+                        else
+                        {
+                            if (d[2] === 3) {
+                                // position move
+
+                                // TODO: remove from current position, to insert later at new position
+                                throw new Error("Not implemented diff type: " + d[2]);
+                            } else {
+                                throw new Error("invalid diff type: " + d[2]);
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                if (d._t == 'a') {
+                    // array diff
+                    target = pname === null ? o : objectGet(o, pname);
+                    if (typeof target != 'object' || !isArray(target)) {
+                        throw new Error('cannot apply patch at "' + subpath + '": array expected');
+                    }
+                    else {
+                        sequenceDiffer.patch(target, d, jsondiffpatch.patch, subpath);
+                    }
+                }
+                else {
+                    // object diff
+                    target = pname === null ? o : objectGet(o, pname);
+                    if (typeof target != 'object' || isArray(target)) {
+                        throw new Error('cannot apply patch at "' + subpath + '": object expected');
+                    }
+                    else {
+                        for (p in d) {
+                            if (d.hasOwnProperty(p)) {
+                                patch(target, p, d[p], subpath);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return o;
+    };
+
+    var unpatch = jdp.unpatch = function(o, pname, d, path){
+
+        if (typeof pname != 'string') {
+            return patch(o, reverse(pname), d);
+        }
+
+        return patch(o, pname, reverse(d), path);
+    };
+
+    if (typeof require === 'function' && typeof exports === 'object' && typeof module === 'object') {
+        // CommonJS, eg: node.js
+        module.exports = jdp;
+    } else if (typeof define === 'function' && define.amd) {
+        // AMD
+        define(jdp);
+    } else {
+        // browser or worker global
+        if (typeof window !== 'undefined') {
+            window.jsondiffpatch = jdp;
+        } else {
+            self.jsondiffpatch = jdp;
+        }
+    }
+
+})();
+
+},{}],6:[function(require,module,exports){
 // These methods let you build a transform function from a transformComponent
 // function for OT types like JSON0 in which operations are lists of components
 // and transforming them requires N^2 work. I find it kind of nasty that I need
@@ -229,7 +1306,7 @@ function bootstrapTransform(type, transformComponent, checkValidOp, append) {
   };
 };
 
-},{}],4:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 // Only the JSON type is exported, because the text type is deprecated
 // otherwise. (If you want to use it somewhere, you're welcome to pull it out
 // into a separate module that json0 can depend on).
@@ -238,7 +1315,7 @@ module.exports = {
   type: require('./json0')
 };
 
-},{"./json0":5}],5:[function(require,module,exports){
+},{"./json0":8}],8:[function(require,module,exports){
 /*
  This is the implementation of the JSON OT type.
 
@@ -905,7 +1982,7 @@ json.registerSubtype(text);
 module.exports = json;
 
 
-},{"./bootstrapTransform":3,"./text0":6}],6:[function(require,module,exports){
+},{"./bootstrapTransform":6,"./text0":9}],9:[function(require,module,exports){
 // DEPRECATED!
 //
 // This type works, but is not exported. Its included here because the JSON0
@@ -1163,7 +2240,7 @@ text.invert = function(op) {
 
 require('./bootstrapTransform')(text, transformComponent, checkValidOp, append);
 
-},{"./bootstrapTransform":3}],7:[function(require,module,exports){
+},{"./bootstrapTransform":6}],10:[function(require,module,exports){
 (function (global){
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.sketchjs = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var sketchjs,
@@ -1271,9 +2348,15 @@ sketchjs = function($) {
       return shapes;
     };
 
-    Sketch.prototype.loadShapes = function(shapes) {
+    Sketch.prototype.loadShapes = function(shapes, silent) {
+      if (silent == null) {
+        silent = false;
+      }
       this.actions = shapes;
-      return this.redraw();
+      this.redraw();
+      if (!silent) {
+        return this.canvas.trigger("change");
+      }
     };
 
     Sketch.prototype.set = function(key, value) {
@@ -1308,7 +2391,9 @@ sketchjs = function($) {
         e.pageX = e.originalEvent.targetTouches[0].pageX;
         e.pageY = e.originalEvent.targetTouches[0].pageY;
       }
-      return $.sketch.tools[$(this).data('sketch').tool].onEvent.call($(this).data('sketch'), e);
+      $.sketch.tools[$(this).data('sketch').tool].onEvent.call($(this).data('sketch'), e);
+      e.preventDefault();
+      return false;
     };
 
     Sketch.prototype.redraw = function() {

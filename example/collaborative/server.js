@@ -5,6 +5,7 @@ var Duplex = require('stream').Duplex;
 var browserChannel = require('browserchannel').server
 
 var share = require('share').server.createClient({ backend: backend });
+var json = require('ot-json0')
 var express = require('express');
 var app = express();
 
