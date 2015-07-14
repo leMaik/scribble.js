@@ -150,9 +150,11 @@ sketchjs = ($) ->
     # *Internal method.* Called when the mouse is released or leaves the canvas.
     stopPainting: ->
       @actions.push @action if @action
+      @redraw()
+      if @action
+        @canvas.trigger("change", @action)
       @painting = false
       @action = null
-      @redraw()
     
     # ### sketch.onEvent(e)
     #
@@ -164,8 +166,8 @@ sketchjs = ($) ->
         e.pageX = e.originalEvent.targetTouches[0].pageX
         e.pageY = e.originalEvent.targetTouches[0].pageY
       $.sketch.tools[$(this).data('sketch').tool].onEvent.call($(this).data('sketch'), e)
-      e.preventDefault()
-      false
+      #e.preventDefault()
+      #false
 
     # ### sketch.redraw()
     #
