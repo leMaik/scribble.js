@@ -60,7 +60,6 @@ sketchjs = ($) ->
     constructor: (el, opts)->
       @el = el
       @canvas = $(el)
-      @context = el.getContext '2d'
       @options = $.extend {
         toolLinks: true
         defaultTool: 'marker'
@@ -81,7 +80,35 @@ sketchjs = ($) ->
       @actions = []
       @action = []
 
-      @canvas.bind 'click mousedown mouseup mousemove mouseleave mouseout touchstart touchmove touchend touchcancel', @onEvent
+
+      getCursorPosition = (e) =>
+        if e.originalEvent && e.originalEvent.targetTouches
+          e.pageX = e.originalEvent.targetTouches[0].pageX
+          e.pageY = e.originalEvent.targetTouches[0].pageY
+        return {
+          x: e.pageX - @canvas.offset().left
+          y: e.pageY - @canvas.offset().top
+        }
+        
+      currentTool = => $.sketch.tools[$(this).data('sketch').tool]
+      
+      @canvas.bind 'mousedown touchstart', (e) ->
+        @actions.push
+          tool: @tool
+          color: @color
+          size: parseFloat(@size)
+          events: []
+        
+        @actions = currentTool().startUse.call undefined, @context, getCursorPosition(), @actions
+        @redraw()
+        
+      @canvas.bind 'mousemove touchmove', (e) ->
+        @actions = currentTool().continueUse.call undefined, @context, getCursorPosition(), @actions
+        @redraw()
+        
+      @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) ->
+        @actions = currentTool().stopUse.call undefined, @context, getCursorPosition(), @actions
+        @redraw()
 
       # ### Tool Links
       #
@@ -207,25 +234,13 @@ sketchjs = ($) ->
     #
     # *Internal method.* Called when the mouse is released or leaves the canvas.
     stopPainting: ->
-      @actions.push @action if @action
-      delete @action
-      @painting = false
-      @redraw()
-      @canvas.trigger "change", [@getShapes(), @old]
-      delete @old
-      
-    # ### sketch.onEvent(e)
-    #
-    # *Internal method.* Universal event handler for the canvas. Any mouse or
-    # touch related events are passed through this handler before being passed
-    # on to the individual tools.
-    onEvent: (e)->
-      if e.originalEvent && e.originalEvent.targetTouches
-        e.pageX = e.originalEvent.targetTouches[0].pageX
-        e.pageY = e.originalEvent.targetTouches[0].pageY
-      $.sketch.tools[$(this).data('sketch').tool].onEvent.call($(this).data('sketch'), e)
-      e.preventDefault()
-      false
+      if @painting
+        @actions.push @action if @action
+        delete @action
+        @painting = false
+        @redraw()
+        @canvas.trigger "change", [@getShapes(), @old]
+        delete @old
 
     # ### sketch.redraw()
     #
@@ -234,24 +249,24 @@ sketchjs = ($) ->
     # something renderable.
     redraw: ->
       @el.width = @canvas.width()
-      @context = @el.getContext '2d'
+      context = @el.getContext '2d'
 
       if @background?
-        @context.drawImage @background, 0, 0
+        context.drawImage @background, 0, 0
 
       sketch = this
       $.each @actions, ->
         if this.tool
-          $.sketch.tools[this.tool].draw.call sketch, this
-      $.sketch.tools[@action.tool].draw.call sketch, @action if @painting && @action
+          $.sketch.tools[this.tool].draw.call undefined, this, context
+      $.sketch.tools[@action.tool].draw.call undefined, @action, context if @painting && @action
 
   # # Tools
   #
   # Sketch.js is built with a pluggable, extensible tool foundation. Each tool works
   # by accepting and manipulating events registered on the sketch using an `onEvent`
   # method and then building up **actions** that, when passed to the `draw` method,
-  # will render the tool's effect to the canvas. The tool methods are executed with
-  # the Sketch instance as `this`.
+  # will render the tool's effect to the canvas. The tool methods are executed without
+  # a `this` instance and may not have any state.
   #
   # Tools can be added simply by adding a new key to the `$.sketch.tools` object.
   $.sketch = { tools: {} }
@@ -261,95 +276,96 @@ sketchjs = ($) ->
   # The marker is the most basic drawing tool. It will draw a stroke of the current
   # width and current color wherever the user drags his or her mouse.
   $.sketch.tools.marker =
-    onEvent: (e)->
-      switch e.type
-        when 'mousedown', 'touchstart'
-          @startPainting()
-        when 'mouseup', 'mouseout', 'mouseleave', 'touchend', 'touchcancel'
-          @stopPainting()
+    startUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+      
+    continueUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+    
+    stopUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+      
+    draw: (action, context) ->
+      context.lineJoin = "round"
+      context.lineCap = "round"
+      context.beginPath()
 
-      if @painting
-        @action.events.push
-          x: e.pageX - @canvas.offset().left
-          y: e.pageY - @canvas.offset().top
-
-        @redraw()
-
-    draw: (action)->
-      @context.lineJoin = "round"
-      @context.lineCap = "round"
-      @context.beginPath()
-
-      @context.moveTo action.events[0].x, action.events[0].y
+      context.moveTo action.events[0].x, action.events[0].y
       for event in action.events
-        @context.lineTo event.x, event.y
-
+        context.lineTo event.x, event.y
         previous = event
-      @context.strokeStyle = action.color
-      @context.lineWidth = action.size
-      @context.stroke()
-      @context.closePath()
-  
+        
+      context.strokeStyle = action.color
+      context.lineWidth = action.size
+      context.stroke()
+      context.closePath()
+ 
   # ## highlighter
   #
   # The highlighter works like the marker but uses a different blending mode to look more like a highlighter.
   $.sketch.tools.highlighter =
-    onEvent: (e)->
-      $.sketch.tools.marker.onEvent.call this, e
+    startUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+      
+    continueUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+    
+    stopUse: (context, position, actions) ->
+      actions[actions.length - 1].events.push position
+      return actions
+      
+    draw: (action, context) ->
+      context.lineJoin = "round"
+      context.lineCap = "round"
+      context.beginPath()
 
-    draw: (action)->
-      @context.lineJoin = "round"
-      @context.lineCap = "round"
-      @context.beginPath()
-
-      @context.moveTo action.events[0].x, action.events[0].y
+      context.moveTo action.events[0].x, action.events[0].y
       for event in action.events
-        @context.lineTo event.x, event.y
-
+        context.lineTo event.x, event.y
         previous = event
-      @context.strokeStyle = action.color
-      @context.lineWidth = action.size
-      @context.globalCompositeOperation = "multiply"
-      @context.stroke()
-      @context.closePath()
-      @context.globalCompositeOperation = "source-over"
+        
+      context.strokeStyle = action.color
+      context.lineWidth = action.size
+      context.globalCompositeOperation = "multiply"
+      context.stroke()
+      context.closePath()
+      context.globalCompositeOperation = "source-over"
 
   # ## eraser
   #
   # The eraser does just what you'd expect: removes any of the existing sketch.
   $.sketch.tools.eraser =
-    onEvent: (e)->
-      switch e.type
-        when 'mousedown', 'touchstart'
-          @startPainting()
-        when 'mouseup', 'mouseout', 'mouseleave', 'touchend', 'touchcancel'
-          @action = null
-          @stopPainting()
+    startUse: (context, position, actions) ->
+      actions.pop() # eraser does not need an action
+      return actions
+      
+    continueUse: (context, position, actions) ->
+      inRadius = (p1, p2, r = 10) -> Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r
 
-      if @painting
-        location =
-          x: e.pageX - @canvas.offset().left
-          y: e.pageY - @canvas.offset().top
-          event: e.type
+      newActions = []
+      for otherAction in actions
+        remove = no
+        if otherAction.events?
+          for event in otherAction.events
+            if inRadius(location, event)
+              remove = yes
+              break
 
-        inRadius = (p1, p2, r = 10) -> Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r
+        if not remove
+          newActions.push otherAction
 
-        newActions = []
-        for otherAction in @actions
-          remove = no
-          if otherAction.events?
-            for event in otherAction.events
-              if inRadius(location, event)
-                remove = yes
-                break
-
-          if not remove
-            newActions.push otherAction
-
-        @actions = newActions
-        @redraw()
-
-    draw: (action) ->
+      return newActions
+    
+    stopUse: (context, position, actions) ->
+      return actions
+      
+    draw: (action, context) ->
+      # an eraser doesn't draw
 
 # ## Sketch.js module
 #
