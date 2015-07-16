@@ -126,9 +126,10 @@ sketchjs = ($) ->
       return shapes
 
     loadShapes: (shapes, silent = no) ->
+      old = @actions
       @actions = shapes
       @redraw()
-      @canvas.trigger("change") if not silent
+      @canvas.trigger("change", [@actions, old]) if not silent
       
     # ### sketch.set(key, value)
     #
@@ -145,6 +146,7 @@ sketchjs = ($) ->
     # that begins a paint stroke.
     startPainting: ->
       @painting = true
+      @old = @getShapes()
       @action = {
         tool: @tool
         color: @color
@@ -205,13 +207,12 @@ sketchjs = ($) ->
     #
     # *Internal method.* Called when the mouse is released or leaves the canvas.
     stopPainting: ->
-      old = @getShapes()      
       @actions.push @action if @action
-      @redraw()
+      delete @action
       @painting = false
-      if @action
-        @canvas.trigger "change", [@getShapes(), old]
-      @action = null
+      @redraw()
+      @canvas.trigger "change", [@getShapes(), @old]
+      delete @old
       
     # ### sketch.onEvent(e)
     #
