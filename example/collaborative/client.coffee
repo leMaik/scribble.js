@@ -29,6 +29,6 @@ $ ->
         doc.create json.type.name, { shapes: [] }
       ctx = doc.createContext()
       
-      $('#simple_sketch').on 'change', (e, newShapes, old) ->
+      $('#simple_sketch').on 'afterPaint', (e, newShapes, old) ->
         diff = jsondiff.diff { shapes: old }, { shapes: newShapes }
         ctx.submitOp diff

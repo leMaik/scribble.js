@@ -39,7 +39,7 @@ $(function() {
       });
     }
     ctx = doc.createContext();
-    return $('#simple_sketch').on('change', function(e, newShapes, old) {
+    return $('#simple_sketch').on('afterPaint', function(e, newShapes, old) {
       var diff;
       diff = jsondiff.diff({
         shapes: old
@@ -2296,17 +2296,15 @@ sketchjs = function($) {
   };
   Sketch = (function() {
     function Sketch(el, opts) {
-      var bgImage;
+      var bgImage, currentTool, getCursorPosition, old, painting;
       this.el = el;
       this.canvas = $(el);
-      this.context = el.getContext('2d');
       this.options = $.extend({
         toolLinks: true,
         defaultTool: 'marker',
         defaultColor: '#000000',
         defaultSize: 5
       }, opts);
-      this.painting = false;
       this.color = this.options.defaultColor;
       this.size = this.options.defaultSize;
       this.tool = this.options.defaultTool;
@@ -2322,8 +2320,57 @@ sketchjs = function($) {
         bgImage.src = this.canvas.data('background');
       }
       this.actions = [];
-      this.action = [];
-      this.canvas.bind('click mousedown mouseup mousemove mouseleave mouseout touchstart touchmove touchend touchcancel', this.onEvent);
+      getCursorPosition = (function(_this) {
+        return function(e) {
+          if (e.originalEvent && e.originalEvent.targetTouches) {
+            e.pageX = e.originalEvent.targetTouches[0].pageX;
+            e.pageY = e.originalEvent.targetTouches[0].pageY;
+          }
+          return {
+            x: e.pageX - _this.canvas.offset().left,
+            y: e.pageY - _this.canvas.offset().top
+          };
+        };
+      })(this);
+      currentTool = (function(_this) {
+        return function() {
+          return $.sketch.tools[_this.tool];
+        };
+      })(this);
+      old = [];
+      painting = false;
+      this.canvas.bind('mousedown touchstart', (function(_this) {
+        return function(e) {
+          painting = true;
+          old = _this.getShapes();
+          _this.actions.push({
+            tool: _this.tool,
+            color: _this.color,
+            size: parseFloat(_this.size),
+            events: []
+          });
+          _this.actions = currentTool().startUse.call(void 0, _this.context, getCursorPosition(e), _this.actions);
+          return _this.redraw();
+        };
+      })(this));
+      this.canvas.bind('mousemove touchmove', (function(_this) {
+        return function(e) {
+          if (painting) {
+            _this.actions = currentTool().continueUse.call(void 0, _this.context, getCursorPosition(e), _this.actions);
+            return _this.redraw();
+          }
+        };
+      })(this));
+      this.canvas.bind('mouseup mouseleave mouseout touchend touchcancel', (function(_this) {
+        return function(e) {
+          if (painting) {
+            painting = false;
+            _this.actions = currentTool().stopUse.call(void 0, _this.context, getCursorPosition(e), _this.actions);
+            _this.redraw();
+            return _this.canvas.trigger("afterPaint", [_this.actions, old]);
+          }
+        };
+      })(this));
       if (this.options.toolLinks) {
         $('body').delegate("a[href=\"#" + (this.canvas.attr('id')) + "\"]", 'click', function(e) {
           var $canvas, $this, j, key, len, ref, sketch;
@@ -2356,16 +2403,7 @@ sketchjs = function($) {
     };
 
     Sketch.prototype.getShapes = function() {
-      var action, j, len, ref, shapes;
-      shapes = [];
-      ref = this.actions;
-      for (j = 0, len = ref.length; j < len; j++) {
-        action = ref[j];
-        if (action.events != null) {
-          shapes.push(action);
-        }
-      }
-      return shapes;
+      return this.actions.slice();
     };
 
     Sketch.prototype.loadShapes = function(shapes, silent) {
@@ -2377,7 +2415,7 @@ sketchjs = function($) {
       this.actions = shapes;
       this.redraw();
       if (!silent) {
-        return this.canvas.trigger("change", [this.actions, old]);
+        return this.canvas.trigger("afterPaint", [this.actions, old]);
       }
     };
 
@@ -2386,18 +2424,29 @@ sketchjs = function($) {
       return this.canvas.trigger("sketch.change" + key, value);
     };
 
-    Sketch.prototype.startPainting = function() {
-      this.painting = true;
-      this.old = this.getShapes();
-      return this.action = {
-        tool: this.tool,
-        color: this.color,
-        size: parseFloat(this.size),
-        events: []
-      };
+    Sketch.prototype.redraw = function() {
+      var context, sketch;
+      this.el.width = this.canvas.width();
+      context = this.el.getContext('2d');
+      if (this.background != null) {
+        context.drawImage(this.background, 0, 0);
+      }
+      sketch = this;
+      return $.each(this.actions, function() {
+        if (this.tool) {
+          return $.sketch.tools[this.tool].draw.call(void 0, this, context);
+        }
+      });
     };
 
-    Sketch.prototype.calculateCurvature = function(p1, p2, p3) {
+    return Sketch;
+
+  })();
+  $.sketch = {
+    tools: {}
+  };
+  $.sketch.tools.marker = {
+    calculateCurvature: function(p1, p2, p3) {
       var crossZ, k, phi, r1, r2;
       r1 = {
         x: p2.x - p1.x,
@@ -2424,9 +2473,8 @@ sketchjs = function($) {
                    | ax by - bx ay  |
        */
       return k;
-    };
-
-    Sketch.prototype.optimize = function(action) {
+    },
+    optimize: function(action) {
       var curvatureThreshold, i, j, k, last, newPath, path, ref;
       curvatureThreshold = 0.08;
       path = action.events;
@@ -2442,170 +2490,109 @@ sketchjs = function($) {
       newPath.push(path[path.length - 1]);
       action.events = newPath;
       return action;
-      return action;
-    };
-
-    Sketch.prototype.stopPainting = function() {
-      if (this.action) {
-        this.actions.push(this.action);
-      }
-      delete this.action;
-      this.painting = false;
-      this.redraw();
-      this.canvas.trigger("change", [this.getShapes(), this.old]);
-      return delete this.old;
-    };
-
-    Sketch.prototype.onEvent = function(e) {
-      if (e.originalEvent && e.originalEvent.targetTouches) {
-        e.pageX = e.originalEvent.targetTouches[0].pageX;
-        e.pageY = e.originalEvent.targetTouches[0].pageY;
-      }
-      $.sketch.tools[$(this).data('sketch').tool].onEvent.call($(this).data('sketch'), e);
-      e.preventDefault();
-      return false;
-    };
-
-    Sketch.prototype.redraw = function() {
-      var sketch;
-      this.el.width = this.canvas.width();
-      this.context = this.el.getContext('2d');
-      if (this.background != null) {
-        this.context.drawImage(this.background, 0, 0);
-      }
-      sketch = this;
-      $.each(this.actions, function() {
-        if (this.tool) {
-          return $.sketch.tools[this.tool].draw.call(sketch, this);
-        }
-      });
-      if (this.painting && this.action) {
-        return $.sketch.tools[this.action.tool].draw.call(sketch, this.action);
-      }
-    };
-
-    return Sketch;
-
-  })();
-  $.sketch = {
-    tools: {}
-  };
-  $.sketch.tools.marker = {
-    onEvent: function(e) {
-      switch (e.type) {
-        case 'mousedown':
-        case 'touchstart':
-          this.startPainting();
-          break;
-        case 'mouseup':
-        case 'mouseout':
-        case 'mouseleave':
-        case 'touchend':
-        case 'touchcancel':
-          this.stopPainting();
-      }
-      if (this.painting) {
-        this.action.events.push({
-          x: e.pageX - this.canvas.offset().left,
-          y: e.pageY - this.canvas.offset().top
-        });
-        return this.redraw();
-      }
     },
-    draw: function(action) {
+    startUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      return actions;
+    },
+    continueUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      return actions;
+    },
+    stopUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      actions[actions.length - 1] = $.sketch.tools.marker.optimize(actions[actions.length - 1]);
+      return actions;
+    },
+    draw: function(action, context) {
       var event, j, len, previous, ref;
-      this.context.lineJoin = "round";
-      this.context.lineCap = "round";
-      this.context.beginPath();
-      this.context.moveTo(action.events[0].x, action.events[0].y);
+      context.lineJoin = "round";
+      context.lineCap = "round";
+      context.beginPath();
+      context.moveTo(action.events[0].x, action.events[0].y);
       ref = action.events;
       for (j = 0, len = ref.length; j < len; j++) {
         event = ref[j];
-        this.context.lineTo(event.x, event.y);
+        context.lineTo(event.x, event.y);
         previous = event;
       }
-      this.context.strokeStyle = action.color;
-      this.context.lineWidth = action.size;
-      this.context.stroke();
-      return this.context.closePath();
+      context.strokeStyle = action.color;
+      context.lineWidth = action.size;
+      context.stroke();
+      return context.closePath();
     }
   };
   $.sketch.tools.highlighter = {
-    onEvent: function(e) {
-      return $.sketch.tools.marker.onEvent.call(this, e);
+    startUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      return actions;
     },
-    draw: function(action) {
+    continueUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      return actions;
+    },
+    stopUse: function(context, position, actions) {
+      actions[actions.length - 1].events.push(position);
+      actions[actions.length - 1] = $.sketch.tools.marker.optimize(actions[actions.length - 1]);
+      return actions;
+    },
+    draw: function(action, context) {
       var event, j, len, previous, ref;
-      this.context.lineJoin = "round";
-      this.context.lineCap = "round";
-      this.context.beginPath();
-      this.context.moveTo(action.events[0].x, action.events[0].y);
+      context.lineJoin = "round";
+      context.lineCap = "round";
+      context.beginPath();
+      context.moveTo(action.events[0].x, action.events[0].y);
       ref = action.events;
       for (j = 0, len = ref.length; j < len; j++) {
         event = ref[j];
-        this.context.lineTo(event.x, event.y);
+        context.lineTo(event.x, event.y);
         previous = event;
       }
-      this.context.strokeStyle = action.color;
-      this.context.lineWidth = action.size;
-      this.context.globalCompositeOperation = "multiply";
-      this.context.stroke();
-      this.context.closePath();
-      return this.context.globalCompositeOperation = "source-over";
+      context.strokeStyle = action.color;
+      context.lineWidth = action.size;
+      context.globalCompositeOperation = "multiply";
+      context.stroke();
+      context.closePath();
+      return context.globalCompositeOperation = "source-over";
     }
   };
   return $.sketch.tools.eraser = {
-    onEvent: function(e) {
-      var event, inRadius, j, l, len, len1, location, newActions, otherAction, ref, ref1, remove;
-      switch (e.type) {
-        case 'mousedown':
-        case 'touchstart':
-          this.startPainting();
-          break;
-        case 'mouseup':
-        case 'mouseout':
-        case 'mouseleave':
-        case 'touchend':
-        case 'touchcancel':
-          this.action = null;
-          this.stopPainting();
-      }
-      if (this.painting) {
-        location = {
-          x: e.pageX - this.canvas.offset().left,
-          y: e.pageY - this.canvas.offset().top,
-          event: e.type
-        };
-        inRadius = function(p1, p2, r) {
-          if (r == null) {
-            r = 10;
-          }
-          return Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r;
-        };
-        newActions = [];
-        ref = this.actions;
-        for (j = 0, len = ref.length; j < len; j++) {
-          otherAction = ref[j];
-          remove = false;
-          if (otherAction.events != null) {
-            ref1 = otherAction.events;
-            for (l = 0, len1 = ref1.length; l < len1; l++) {
-              event = ref1[l];
-              if (inRadius(location, event)) {
-                remove = true;
-                break;
-              }
+    startUse: function(context, position, actions) {
+      actions.pop();
+      return actions;
+    },
+    continueUse: function(context, position, actions) {
+      var event, inRadius, j, l, len, len1, newActions, otherAction, ref, remove;
+      inRadius = function(p1, p2, r) {
+        if (r == null) {
+          r = 10;
+        }
+        return Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r;
+      };
+      newActions = [];
+      for (j = 0, len = actions.length; j < len; j++) {
+        otherAction = actions[j];
+        remove = false;
+        if (otherAction.events != null) {
+          ref = otherAction.events;
+          for (l = 0, len1 = ref.length; l < len1; l++) {
+            event = ref[l];
+            if (inRadius(position, event)) {
+              remove = true;
+              break;
             }
           }
-          if (!remove) {
-            newActions.push(otherAction);
-          }
         }
-        this.actions = newActions;
-        return this.redraw();
+        if (!remove) {
+          newActions.push(otherAction);
+        }
       }
+      return newActions;
     },
-    draw: function(action) {}
+    stopUse: function(context, position, actions) {
+      return actions;
+    },
+    draw: function(action, context) {}
   };
 };
 
