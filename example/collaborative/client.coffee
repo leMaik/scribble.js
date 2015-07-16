@@ -5,6 +5,9 @@ json = require 'ot-json0'
 jsondiff = require 'jsondiff-share-ops'
 
 $ ->
+    $.each ['#f00', '#ff0', '#0f0', '#0ff', '#00f', '#000', '#fff'], ->
+      $('#tools').append "<a href='#simple_sketch' data-color='" + this + "' style='border: 1px solid black; width: 30px; height: 30px; background: " + this + "; display: inline-block;'></a> "
+        
     sketch = $('#simple_sketch').sketch().sketch();
     
     getUrlParameter = (name) ->
@@ -16,10 +19,10 @@ $ ->
     ctx = null
     
     doc.subscribe ->
-      sketch.loadShapes(ctx?.getSnapshot().shapes)
+      sketch.loadShapes(ctx?.getSnapshot().shapes, yes)
       
     doc.on 'after op', ->
-      sketch.loadShapes(ctx?.getSnapshot().shapes)
+      sketch.loadShapes(ctx?.getSnapshot().shapes, yes)
     
     doc.whenReady ->          
       if (!doc.type)
@@ -27,6 +30,5 @@ $ ->
       ctx = doc.createContext()
       
       $('#simple_sketch').on 'change', (e, newShapes, old) ->
-        if arguments.length >= 3
-            diff = jsondiff.diff { shapes: old }, { shapes: newShapes }
-            ctx.submitOp diff
+        diff = jsondiff.diff { shapes: old }, { shapes: newShapes }
+        ctx.submitOp diff

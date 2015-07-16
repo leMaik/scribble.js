@@ -13,6 +13,9 @@ jsondiff = require('jsondiff-share-ops');
 
 $(function() {
   var ctx, doc, getUrlParameter, sjs, sketch, socket;
+  $.each(['#f00', '#ff0', '#0f0', '#0ff', '#00f', '#000', '#fff'], function() {
+    return $('#tools').append("<a href='#simple_sketch' data-color='" + this + "' style='border: 1px solid black; width: 30px; height: 30px; background: " + this + "; display: inline-block;'></a> ");
+  });
   sketch = $('#simple_sketch').sketch().sketch();
   getUrlParameter = function(name) {
     return (new RegExp(name + '=' + '(.+?)(&|$)').exec(window.location.search) || [null])[1];
@@ -24,10 +27,10 @@ $(function() {
   doc = sjs.get('bla', 'blubbs2');
   ctx = null;
   doc.subscribe(function() {
-    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0);
+    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0, true);
   });
   doc.on('after op', function() {
-    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0);
+    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0, true);
   });
   return doc.whenReady(function() {
     if (!doc.type) {
@@ -38,14 +41,12 @@ $(function() {
     ctx = doc.createContext();
     return $('#simple_sketch').on('change', function(e, newShapes, old) {
       var diff;
-      if (arguments.length >= 3) {
-        diff = jsondiff.diff({
-          shapes: old
-        }, {
-          shapes: newShapes
-        });
-        return ctx.submitOp(diff);
-      }
+      diff = jsondiff.diff({
+        shapes: old
+      }, {
+        shapes: newShapes
+      });
+      return ctx.submitOp(diff);
     });
   });
 });
@@ -2368,13 +2369,15 @@ sketchjs = function($) {
     };
 
     Sketch.prototype.loadShapes = function(shapes, silent) {
+      var old;
       if (silent == null) {
         silent = false;
       }
+      old = this.actions;
       this.actions = shapes;
       this.redraw();
       if (!silent) {
-        return this.canvas.trigger("change");
+        return this.canvas.trigger("change", [this.actions, old]);
       }
     };
 
@@ -2385,6 +2388,7 @@ sketchjs = function($) {
 
     Sketch.prototype.startPainting = function() {
       this.painting = true;
+      this.old = this.getShapes();
       return this.action = {
         tool: this.tool,
         color: this.color,
@@ -2442,17 +2446,14 @@ sketchjs = function($) {
     };
 
     Sketch.prototype.stopPainting = function() {
-      var old;
-      old = this.getShapes();
       if (this.action) {
         this.actions.push(this.action);
       }
-      this.redraw();
+      delete this.action;
       this.painting = false;
-      if (this.action) {
-        this.canvas.trigger("change", [this.getShapes(), old]);
-      }
-      return this.action = null;
+      this.redraw();
+      this.canvas.trigger("change", [this.getShapes(), this.old]);
+      return delete this.old;
     };
 
     Sketch.prototype.onEvent = function(e) {
