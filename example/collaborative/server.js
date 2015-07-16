@@ -40,4 +40,4 @@ app.use(browserChannel(function (client) {
 	return share.listen(stream);
 }));
 
-app.listen(8080);
+app.listen(process.argv[2] || 8080);
