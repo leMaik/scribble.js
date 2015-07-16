@@ -325,7 +325,7 @@ sketchjs = ($) ->
         remove = no
         if otherAction.events?
           for event in otherAction.events
-            if inRadius(location, event)
+            if inRadius(position, event)
               remove = yes
               break
 
