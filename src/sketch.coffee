@@ -90,10 +90,13 @@ sketchjs = ($) ->
         
       currentTool = => $.sketch.tools[@tool]
       
+      old = []
       painting = no
       
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
+        old = @getShapes()
+        
         @actions.push
           tool: @tool
           color: @color
@@ -113,6 +116,9 @@ sketchjs = ($) ->
           painting = no
           @actions = currentTool().stopUse.call undefined, @context, getCursorPosition(e), @actions
           @redraw()
+          
+          @canvas.trigger "afterPaint", [@actions, old]
+          
 
       # ### Tool Links
       #
@@ -156,7 +162,7 @@ sketchjs = ($) ->
       old = @actions
       @actions = shapes
       @redraw()
-      @canvas.trigger("change", [@actions, old]) if not silent
+      @canvas.trigger("afterPaint", [@actions, old]) if not silent
       
     # ### sketch.set(key, value)
     #
