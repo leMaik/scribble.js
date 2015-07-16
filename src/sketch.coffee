@@ -66,7 +66,6 @@ sketchjs = ($) ->
         defaultColor: '#000000'
         defaultSize: 5
       }, opts
-      @painting = false
       @color = @options.defaultColor
       @size = @options.defaultSize
       @tool = @options.defaultTool
@@ -78,7 +77,6 @@ sketchjs = ($) ->
           @redraw()
         bgImage.src = @canvas.data('background')
       @actions = []
-      @action = []
 
 
       getCursorPosition = (e) =>
@@ -90,25 +88,31 @@ sketchjs = ($) ->
           y: e.pageY - @canvas.offset().top
         }
         
-      currentTool = => $.sketch.tools[$(this).data('sketch').tool]
+      currentTool = => $.sketch.tools[@tool]
       
-      @canvas.bind 'mousedown touchstart', (e) ->
+      painting = no
+      
+      @canvas.bind 'mousedown touchstart', (e) =>
+        painting = yes
         @actions.push
           tool: @tool
           color: @color
           size: parseFloat(@size)
           events: []
         
-        @actions = currentTool().startUse.call undefined, @context, getCursorPosition(), @actions
+        @actions = currentTool().startUse.call undefined, @context, getCursorPosition(e), @actions
         @redraw()
         
-      @canvas.bind 'mousemove touchmove', (e) ->
-        @actions = currentTool().continueUse.call undefined, @context, getCursorPosition(), @actions
-        @redraw()
+      @canvas.bind 'mousemove touchmove', (e) =>
+        if painting
+          @actions = currentTool().continueUse.call undefined, @context, getCursorPosition(e), @actions
+          @redraw()
         
-      @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) ->
-        @actions = currentTool().stopUse.call undefined, @context, getCursorPosition(), @actions
-        @redraw()
+      @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) =>
+        if painting
+          painting = no
+          @actions = currentTool().stopUse.call undefined, @context, getCursorPosition(e), @actions
+          @redraw()
 
       # ### Tool Links
       #
@@ -146,11 +150,7 @@ sketchjs = ($) ->
       window.open @el.toDataURL(mime)
 
     getShapes: ->
-      shapes = []
-      for action in @actions
-        if action.events?
-          shapes.push action
-      return shapes
+      @actions.slice()
 
     loadShapes: (shapes, silent = no) ->
       old = @actions
@@ -167,20 +167,39 @@ sketchjs = ($) ->
       this[key] = value
       @canvas.trigger("sketch.change#{key}", value)
 
-    # ### sketch.startPainting()
+    # ### sketch.redraw()
     #
-    # *Internal method.* Called when a mouse or touch event is triggered
-    # that begins a paint stroke.
-    startPainting: ->
-      @painting = true
-      @old = @getShapes()
-      @action = {
-        tool: @tool
-        color: @color
-        size: parseFloat(@size)
-        events: []
-      }
+    # *Internal method.* Redraw the sketchpad from scratch using the aggregated
+    # actions that have been stored as well as the action in progress if it has
+    # something renderable.
+    redraw: ->
+      @el.width = @canvas.width()
+      context = @el.getContext '2d'
 
+      if @background?
+        context.drawImage @background, 0, 0
+
+      sketch = this
+      $.each @actions, ->
+        if this.tool
+          $.sketch.tools[this.tool].draw.call undefined, this, context
+
+  # # Tools
+  #
+  # Sketch.js is built with a pluggable, extensible tool foundation. Each tool works
+  # by accepting and manipulating events registered on the sketch using an `onEvent`
+  # method and then building up **actions** that, when passed to the `draw` method,
+  # will render the tool's effect to the canvas. The tool methods are executed without
+  # a `this` instance and may not have any state.
+  #
+  # Tools can be added simply by adding a new key to the `$.sketch.tools` object.
+  $.sketch = { tools: {} }
+
+  # ## marker
+  #
+  # The marker is the most basic drawing tool. It will draw a stroke of the current
+  # width and current color wherever the user drags his or her mouse.
+  $.sketch.tools.marker =
     # calculates the [discrete] curvature of two connected line segments represented
     # by their points p1-p2-p3 where (p1,p2) is the first line segment and (p2,p3) the second
     calculateCurvature: (p1,p2,p3) ->
@@ -226,56 +245,8 @@ sketchjs = ($) ->
 
       #console.log("optimizedPath\n points before opzimization: " + path.length + "\n points after opzimization: " + newPath.length);
       action.events = newPath
-      return action;
-
       return action
-
-    # ### sketch.stopPainting()
-    #
-    # *Internal method.* Called when the mouse is released or leaves the canvas.
-    stopPainting: ->
-      if @painting
-        @actions.push @action if @action
-        delete @action
-        @painting = false
-        @redraw()
-        @canvas.trigger "change", [@getShapes(), @old]
-        delete @old
-
-    # ### sketch.redraw()
-    #
-    # *Internal method.* Redraw the sketchpad from scratch using the aggregated
-    # actions that have been stored as well as the action in progress if it has
-    # something renderable.
-    redraw: ->
-      @el.width = @canvas.width()
-      context = @el.getContext '2d'
-
-      if @background?
-        context.drawImage @background, 0, 0
-
-      sketch = this
-      $.each @actions, ->
-        if this.tool
-          $.sketch.tools[this.tool].draw.call undefined, this, context
-      $.sketch.tools[@action.tool].draw.call undefined, @action, context if @painting && @action
-
-  # # Tools
-  #
-  # Sketch.js is built with a pluggable, extensible tool foundation. Each tool works
-  # by accepting and manipulating events registered on the sketch using an `onEvent`
-  # method and then building up **actions** that, when passed to the `draw` method,
-  # will render the tool's effect to the canvas. The tool methods are executed without
-  # a `this` instance and may not have any state.
-  #
-  # Tools can be added simply by adding a new key to the `$.sketch.tools` object.
-  $.sketch = { tools: {} }
-
-  # ## marker
-  #
-  # The marker is the most basic drawing tool. It will draw a stroke of the current
-  # width and current color wherever the user drags his or her mouse.
-  $.sketch.tools.marker =
+  
     startUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
@@ -286,6 +257,7 @@ sketchjs = ($) ->
     
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
+      actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
       
     draw: (action, context) ->
@@ -317,6 +289,7 @@ sketchjs = ($) ->
     
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
+      actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
       
     draw: (action, context) ->
