@@ -19,16 +19,16 @@ $ ->
     ctx = null
     
     doc.subscribe ->
-      sketch.loadShapes(ctx?.getSnapshot().shapes, yes)
-      
-    doc.on 'after op', ->
-      sketch.loadShapes(ctx?.getSnapshot().shapes, yes)
-    
+      sketch.loadShapes ctx.getSnapshot().shapes.slice(), yes  
+       
     doc.whenReady ->          
       if (!doc.type)
         doc.create json.type.name, { shapes: [] }
       ctx = doc.createContext()
-      
+      ctx.addListener {}, '', -> #workaround for json0 api bug
+      doc.on 'after op', ->
+        sketch.loadShapes ctx.getSnapshot().shapes.slice(), yes
+        
       $('#simple_sketch').on 'afterPaint', (e, newShapes, old) ->
         diff = jsondiff.diff { shapes: old }, { shapes: newShapes }
-        ctx.submitOp diff
+        ctx.submitOp diff if diff.length > 0

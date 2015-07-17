@@ -27,10 +27,7 @@ $(function() {
   doc = sjs.get('bla', 'blubbs2');
   ctx = null;
   doc.subscribe(function() {
-    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0, true);
-  });
-  doc.on('after op', function() {
-    return sketch.loadShapes(ctx != null ? ctx.getSnapshot().shapes : void 0, true);
+    return sketch.loadShapes(ctx.getSnapshot().shapes.slice(), true);
   });
   return doc.whenReady(function() {
     if (!doc.type) {
@@ -39,6 +36,10 @@ $(function() {
       });
     }
     ctx = doc.createContext();
+    ctx.addListener({}, '', function() {});
+    doc.on('after op', function() {
+      return sketch.loadShapes(ctx.getSnapshot().shapes.slice(), true);
+    });
     return $('#simple_sketch').on('afterPaint', function(e, newShapes, old) {
       var diff;
       diff = jsondiff.diff({
@@ -46,7 +47,9 @@ $(function() {
       }, {
         shapes: newShapes
       });
-      return ctx.submitOp(diff);
+      if (diff.length > 0) {
+        return ctx.submitOp(diff);
+      }
     });
   });
 });
