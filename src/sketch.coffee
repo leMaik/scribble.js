@@ -87,38 +87,38 @@ sketchjs = ($) ->
           x: e.pageX - @canvas.offset().left
           y: e.pageY - @canvas.offset().top
         }
-        
+
       currentTool = => $.sketch.tools[@tool]
-      
+
       old = []
       painting = no
-      
+
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
         old = @getShapes()
-        
+
         @actions.push
           tool: @tool
           color: @color
           size: parseFloat(@size)
           events: []
-        
-        @actions = currentTool().startUse.call undefined, @context, getCursorPosition(e), @actions
+
+        @actions = currentTool().startUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @redraw.bind(this)
         @redraw()
-        
+
       @canvas.bind 'mousemove touchmove', (e) =>
         if painting
-          @actions = currentTool().continueUse.call undefined, @context, getCursorPosition(e), @actions
+          @actions = currentTool().continueUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
           @redraw()
-        
+
       @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) =>
         if painting
           painting = no
-          @actions = currentTool().stopUse.call undefined, @context, getCursorPosition(e), @actions
+          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
           @redraw()
-          
+
           @canvas.trigger "afterPaint", [@actions, old]
-          
+
 
       # ### Tool Links
       #
@@ -163,7 +163,7 @@ sketchjs = ($) ->
       @actions = shapes
       @redraw()
       @canvas.trigger("afterPaint", [@actions, old]) if not silent
-      
+
     # ### sketch.set(key, value)
     #
     # *Internal method.* Sets an arbitrary instance variable on the Sketch instance
@@ -252,20 +252,20 @@ sketchjs = ($) ->
       #console.log("optimizedPath\n points before opzimization: " + path.length + "\n points after opzimization: " + newPath.length);
       action.events = newPath
       return action
-  
+
     startUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
-      
+
     continueUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
-    
+
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
-      
+
     draw: (action, context) ->
       context.lineJoin = "round"
       context.lineCap = "round"
@@ -275,12 +275,12 @@ sketchjs = ($) ->
       for event in action.events
         context.lineTo event.x, event.y
         previous = event
-        
+
       context.strokeStyle = action.color
       context.lineWidth = action.size
       context.stroke()
       context.closePath()
- 
+
   # ## highlighter
   #
   # The highlighter works like the marker but uses a different blending mode to look more like a highlighter.
@@ -288,16 +288,16 @@ sketchjs = ($) ->
     startUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
-      
+
     continueUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
-    
+
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
-      
+
     draw: (action, context) ->
       context.lineJoin = "round"
       context.lineCap = "round"
@@ -307,13 +307,75 @@ sketchjs = ($) ->
       for event in action.events
         context.lineTo event.x, event.y
         previous = event
-        
+
       context.strokeStyle = action.color
       context.lineWidth = action.size
       context.globalCompositeOperation = "multiply"
       context.stroke()
       context.closePath()
       context.globalCompositeOperation = "source-over"
+
+  # ## text tool
+  #
+  # The text tool allows writing text on the sketch.
+  $.sketch.tools.text =
+    _determineFontHeight: (fontStyle) ->
+      body = document.getElementsByTagName("body")[0]
+      dummy = document.createElement("div")
+      dummyText = document.createTextNode("M")
+      dummy.appendChild(dummyText)
+      dummy.setAttribute("style", fontStyle)
+      body.appendChild(dummy)
+      result = dummy.offsetHeight
+      body.removeChild(dummy)
+      return result
+
+    startUse: (context, position, actions, redraw) ->
+      $('body').off '.sketchjstexttool'
+      event =
+        text: ''
+        x: position.x
+        y: position.y
+      actions[actions.length - 1].events.push event
+
+      $('body').on 'keypress.sketchjstexttool', (e) ->
+        if e.keyCode == 13
+          if e.shiftKey
+            fh = $.sketch.tools.text._determineFontHeight context.fontStyle
+            event =
+              text: ''
+              x: event.x
+              y: event.y + fh
+            actions[actions.length - 1].events.push event
+          else
+            $('body').off '.sketchjstexttool'
+        else
+          event.text += String.fromCharCode(e.keyCode)
+          redraw()
+
+      $('body').on 'keyup.sketchjstexttool', (e) ->
+        if e.keyCode == 8
+          if event.text.length == 0
+            events = actions[actions.length - 1].events
+            if events.length > 1
+              events.pop()
+              event = events[events.length - 1]
+          else
+            event.text = event.text.substring(0, event.text.length - 1)
+          redraw()
+
+      return actions
+
+    continueUse: (context, position, actions) ->
+      return actions
+
+    stopUse: (context, position, actions) ->
+      return actions
+
+    draw: (action, context) ->
+      context.fillStyle = action.color
+      for event in action.events
+        context.fillText event.text, event.x, event.y
 
   # ## eraser
   #
@@ -322,7 +384,7 @@ sketchjs = ($) ->
     startUse: (context, position, actions) ->
       actions.pop() # eraser does not need an action
       return actions
-      
+
     continueUse: (context, position, actions) ->
       inRadius = (p1, p2, r = 10) -> Math.abs(p1.x - p2.x) < r && Math.abs(p1.y - p2.y) < r
 
@@ -339,10 +401,10 @@ sketchjs = ($) ->
           newActions.push otherAction
 
       return newActions
-    
+
     stopUse: (context, position, actions) ->
       return actions
-      
+
     draw: (action, context) ->
       # an eraser doesn't draw
 
