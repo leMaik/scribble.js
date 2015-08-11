@@ -80,6 +80,7 @@ sketchjs = ($) ->
 
 
       getCursorPosition = (e) =>
+        return {x: 0, y: 0} if not e?
         if e.originalEvent && e.originalEvent.targetTouches
           e.pageX = e.originalEvent.targetTouches[0].pageX
           e.pageY = e.originalEvent.targetTouches[0].pageY
@@ -93,6 +94,14 @@ sketchjs = ($) ->
       old = []
       painting = no
 
+      stop = (e) =>
+        if painting
+          painting = no
+          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
+          @redraw()
+          
+        @canvas.trigger "afterPaint", [@actions, old]
+
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
         old = @getShapes()
@@ -103,7 +112,7 @@ sketchjs = ($) ->
           size: parseFloat(@size)
           events: []
 
-        @actions = currentTool().startUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @redraw.bind(this)
+        @actions = currentTool().startUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @redraw.bind(this), stop
         @redraw()
 
       @canvas.bind 'mousemove touchmove', (e) =>
@@ -112,12 +121,8 @@ sketchjs = ($) ->
           @redraw()
 
       @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) =>
-        if painting
-          painting = no
-          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
-          @redraw()
-
-          @canvas.trigger "afterPaint", [@actions, old]
+        if not currentTool().customStopHandling
+          stop(e)
 
 
       # ### Tool Links
@@ -319,6 +324,8 @@ sketchjs = ($) ->
   #
   # The text tool allows writing text on the sketch.
   $.sketch.tools.text =
+    customStopHandling: yes
+
     _determineFontHeight: (fontStyle) ->
       body = document.getElementsByTagName("body")[0]
       dummy = document.createElement("div")
@@ -330,7 +337,7 @@ sketchjs = ($) ->
       body.removeChild(dummy)
       return result
 
-    startUse: (context, position, actions, redraw) ->
+    startUse: (context, position, actions, redraw, stop) ->
       $('body').off '.sketchjstexttool'
       event =
         text: ''
@@ -349,12 +356,14 @@ sketchjs = ($) ->
             actions[actions.length - 1].events.push event
           else
             $('body').off '.sketchjstexttool'
+            stop()
         else
           event.text += String.fromCharCode(e.keyCode)
           redraw()
 
       $('body').on 'keyup.sketchjstexttool', (e) ->
         if e.keyCode == 8
+          e.preventDefault()
           if event.text.length == 0
             events = actions[actions.length - 1].events
             if events.length > 1
