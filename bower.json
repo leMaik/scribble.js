@@ -1,9 +1,10 @@
 {
   "name": "sketch.js",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "homepage": "https://github.com/leMaik/sketch.js",
   "authors": [
-    "Maik Marschner <mmarschner@gdv.uni-hannover.de>"
+    "Michael Bleigh and Intridea, Inc."
+    "Maik Marschner <mmarschner@welfenlab.de>"
   ],
   "main": "./lib/sketch.js",
   "license": "MIT",
