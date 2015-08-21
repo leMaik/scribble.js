@@ -196,13 +196,20 @@ sketchjs = ($) ->
       context = @el.getContext '2d'
 
       if @background?
-        context.drawImage @background, 0, 0
+        ratio = @background.width / @background.height
+        newWidth = ratio * @canvas.height()
+        newHeight = @canvas.height()
+        if newWidth > @canvas.width()
+          newWidth = @canvas.width()
+          newHeight = newWidth / ratio
+
+        context.drawImage @background, 0, 0, @background.width, @background.height,
+                          0, 0, newWidth, newHeight
 
       sketch = this
-      scale = @scale
-      $.each @actions, ->
-        if this.tool
-          $.sketch.tools[this.tool].draw.call undefined, this, context, scale
+      for action in @actions
+        if action.tool
+          $.sketch.tools[action.tool].draw.call undefined, action, context, @scale
 
   # # Tools
   #
