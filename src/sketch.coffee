@@ -66,6 +66,7 @@ sketchjs = ($) ->
         defaultColor: '#000000'
         defaultSize: 5
       }, opts
+      @scale = 1
       @color = @options.defaultColor
       @size = @options.defaultSize
       @tool = @options.defaultTool
@@ -85,8 +86,8 @@ sketchjs = ($) ->
           e.pageX = e.originalEvent.targetTouches[0].pageX
           e.pageY = e.originalEvent.targetTouches[0].pageY
         return {
-          x: e.pageX - @canvas.offset().left
-          y: e.pageY - @canvas.offset().top
+          x: (e.pageX - @canvas.offset().left) / @scale
+          y: (e.pageY - @canvas.offset().top) / @scale
         }
 
       currentTool = => $.sketch.tools[@tool]
@@ -99,7 +100,7 @@ sketchjs = ($) ->
           painting = no
           @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
           @redraw()
-          
+
         @canvas.trigger "afterPaint", [@actions, old]
 
       @canvas.bind 'mousedown touchstart', (e) =>
@@ -160,6 +161,13 @@ sketchjs = ($) ->
 
       window.open @el.toDataURL(mime)
 
+    # ### sketch.setScale(scale)
+    #
+    # Set the scaling factor of all drawings.
+    setScale: (scale) ->
+      @scale = scale
+      @redraw()
+
     getShapes: ->
       @actions.slice()
 
@@ -191,9 +199,10 @@ sketchjs = ($) ->
         context.drawImage @background, 0, 0
 
       sketch = this
+      scale = @scale
       $.each @actions, ->
         if this.tool
-          $.sketch.tools[this.tool].draw.call undefined, this, context
+          $.sketch.tools[this.tool].draw.call undefined, this, context, scale
 
   # # Tools
   #
@@ -271,18 +280,18 @@ sketchjs = ($) ->
       actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
 
-    draw: (action, context) ->
+    draw: (action, context, scale) ->
       context.lineJoin = "round"
       context.lineCap = "round"
       context.beginPath()
 
-      context.moveTo action.events[0].x, action.events[0].y
+      context.moveTo action.events[0].x * scale, action.events[0].y * scale
       for event in action.events
-        context.lineTo event.x, event.y
+        context.lineTo event.x * scale, event.y * scale
         previous = event
 
       context.strokeStyle = action.color
-      context.lineWidth = action.size
+      context.lineWidth = action.size * scale
       context.stroke()
       context.closePath()
 
@@ -303,18 +312,18 @@ sketchjs = ($) ->
       actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
       return actions
 
-    draw: (action, context) ->
+    draw: (action, context, scale) ->
       context.lineJoin = "round"
       context.lineCap = "round"
       context.beginPath()
 
-      context.moveTo action.events[0].x, action.events[0].y
+      context.moveTo action.events[0].x * scale, action.events[0].y * scale
       for event in action.events
-        context.lineTo event.x, event.y
+        context.lineTo event.x * scale, event.y * scale
         previous = event
 
       context.strokeStyle = action.color
-      context.lineWidth = action.size
+      context.lineWidth = action.size * scale
       context.globalCompositeOperation = "multiply"
       context.stroke()
       context.closePath()
@@ -381,10 +390,11 @@ sketchjs = ($) ->
     stopUse: (context, position, actions) ->
       return actions
 
-    draw: (action, context) ->
+    draw: (action, context, scale) ->
       context.fillStyle = action.color
       for event in action.events
-        context.fillText event.text, event.x, event.y
+        context.font = (action.size * scale) + 'px Arial'
+        context.fillText event.text, event.x * scale, event.y * scale
 
   # ## eraser
   #
