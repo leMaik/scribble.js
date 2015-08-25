@@ -361,8 +361,9 @@ sketchjs = ($) ->
         y: position.y
       actions[actions.length - 1].events.push event
 
-      $('body').on 'keypress.sketchjstexttool', (e) ->
+      $('body').on 'keydown.sketchjstexttool', (e) ->
         if e.keyCode == 13
+          e.preventDefault()
           if e.shiftKey
             fh = $.sketch.tools.text._determineFontHeight context.fontStyle
             event =
@@ -373,12 +374,7 @@ sketchjs = ($) ->
           else
             $('body').off '.sketchjstexttool'
             stop()
-        else
-          event.text += String.fromCharCode(e.keyCode)
-          redraw()
-
-      $('body').on 'keyup.sketchjstexttool', (e) ->
-        if e.keyCode == 8
+        else if e.keyCode == 8
           e.preventDefault()
           if event.text.length == 0
             events = actions[actions.length - 1].events
@@ -388,6 +384,11 @@ sketchjs = ($) ->
           else
             event.text = event.text.substring(0, event.text.length - 1)
           redraw()
+
+      $('body').on 'keypress.sketchjstexttool', (e) ->
+        event.text += String.fromCharCode(e.charCode)
+        redraw()
+        e.preventDefault()
 
       return actions
 
