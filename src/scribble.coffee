@@ -1,22 +1,22 @@
-# # Sketch.js (v0.0.1)
+# # Scribble.js (v0.0.1)
 #
-# **Sketch.js** is a simple jQuery plugin for creating drawable canvases
+# **Scribble.js** is a simple jQuery plugin for creating drawable canvases
 # using HTML5 Canvas. It supports multiple browsers including mobile
 # devices (albeit with performance penalties).
-sketchjs = ($) ->
+scribblejs = ($) ->
   # calculates the sign of a number
   # see: http://stackoverflow.com/questions/7624920/number-sign-in-javascript
   sign = (x) ->
     if typeof x == 'number' then (if x then (if x < 0 then -1 else 1) else if x == x then 0 else NaN) else NaN
 
 
-  # ### jQuery('#mycanvas').sketch(options)
+  # ### jQuery('#mycanvas').scribble(options)
   #
   # Given an ID selector for a `<canvas>` element, initialize the specified
   # canvas as a drawing canvas. See below for the options that may be passed in.
-  $.fn.sketch = (key, args...)->
+  $.fn.scribble = (key, args...)->
     $.error('Sketch.js can only be called on one element at a time.') if this.length > 1
-    sketch = this.data('sketch')
+    scribble = this.data('scribble')
 
     # If a canvas has already been initialized as a sketchpad, calling
     # `.sketch()` will return the Sketch instance (see documentation below)
@@ -24,27 +24,27 @@ sketchjs = ($) ->
     # it will return the value of any set instance variables. If you pass
     # a string argument followed by a value, it will set an instance variable
     # (e.g. `.sketch('color','#f00')`.
-    if typeof(key) == 'string' && sketch
-      if sketch[key]
-        if typeof(sketch[key]) == 'function'
-          sketch[key].apply sketch, args
+    if typeof(key) == 'string' && scribble
+      if scribble[key]
+        if typeof(scribble[key]) == 'function'
+          scribble[key].apply scribble, args
         else if args.length == 0
-          sketch[key]
+          scribble[key]
         else if args.length == 1
-          sketch[key] = args[0]
+          scribble[key] = args[0]
       else
-        $.error('Sketch.js did not recognize the given command.')
-    else if sketch
-      sketch
+        $.error('Scribble.js did not recognize the given command.')
+    else if scribble
+      scribble
     else
-      this.data('sketch', new Sketch(this.get(0), key))
+      this.data('scribble', new Scribble(this.get(0), key))
       this
 
-  # ## Sketch
+  # ## Scribble
   #
-  # The Sketch class represents an activated drawing canvas. It holds the
+  # The Scribble class represents an activated drawing canvas. It holds the
   # state, all relevant data, and all methods related to the plugin.
-  class Sketch
+  class Scribble
     # ### new Sketch(el, opts)
     #
     # Initialize the Sketch class with a canvas DOM element and any specified
@@ -209,7 +209,7 @@ sketchjs = ($) ->
       sketch = this
       for action in @actions
         if action.tool
-          $.sketch.tools[action.tool].draw.call undefined, action, context, @scale
+          $.scribble.tools[action.tool].draw.call undefined, action, context, @scale
 
   # # Tools
   #
@@ -220,13 +220,13 @@ sketchjs = ($) ->
   # a `this` instance and may not have any state.
   #
   # Tools can be added simply by adding a new key to the `$.sketch.tools` object.
-  $.sketch = { tools: {} }
+  $.scribble = { tools: {} }
 
   # ## marker
   #
   # The marker is the most basic drawing tool. It will draw a stroke of the current
   # width and current color wherever the user drags his or her mouse.
-  $.sketch.tools.marker =
+  $.scribble.tools.marker =
     # calculates the [discrete] curvature of two connected line segments represented
     # by their points p1-p2-p3 where (p1,p2) is the first line segment and (p2,p3) the second
     calculateCurvature: (p1,p2,p3) ->
@@ -305,7 +305,7 @@ sketchjs = ($) ->
   # ## highlighter
   #
   # The highlighter works like the marker but uses a different blending mode to look more like a highlighter.
-  $.sketch.tools.highlighter =
+  $.scribble.tools.highlighter =
     startUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
       return actions
@@ -339,7 +339,7 @@ sketchjs = ($) ->
   # ## text tool
   #
   # The text tool allows writing text on the sketch.
-  $.sketch.tools.text =
+  $.scribble.tools.text =
     customStopHandling: yes
 
     _determineFontHeight: (fontStyle) ->
@@ -407,7 +407,7 @@ sketchjs = ($) ->
   # ## eraser
   #
   # The eraser does just what you'd expect: removes any of the existing sketch.
-  $.sketch.tools.eraser =
+  $.scribble.tools.eraser =
     startUse: (context, position, actions) ->
       actions.pop() # eraser does not need an action
       return actions
@@ -435,8 +435,8 @@ sketchjs = ($) ->
     draw: (action, context) ->
       # an eraser doesn't draw
 
-# ## Sketch.js module
+# ## Scribble.js module
 #
-# **Sketch.js** is exported as a function. Simply invoke it with `jQuery` as first argument
+# **Scribble.js** is exported as a function. Simply invoke it with `jQuery` as first argument
 # to activate it.
-module.exports = sketchjs
+module.exports = scribblejs

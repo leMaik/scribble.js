@@ -2,16 +2,16 @@
 <html>
   <head>
     <script src="http://code.jquery.com/jquery-latest.js"></script>
-    <script src='../lib/sketch.js'></script>
+    <script src='../lib/scribble.js'></script>
     <script type='text/javascript'>
-      sketchjs($);
-      
+      scribblejs($);
+
       $(function() {
         $.each(['#f00', '#ff0', '#0f0', '#0ff', '#00f', '#000', '#fff'], function() {
           $('#tools').append("<a href='#colored_sketch' data-color='" + this + "' style='border: 1px solid black; width: 30px; height: 30px; background: " + this + "; display: inline-block;'></a> ");
         });
 
-        $('#colored_sketch').sketch();
+        $('#colored_sketch').scribble();
       });
     </script>
   </head>

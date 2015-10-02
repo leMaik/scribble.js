@@ -11,19 +11,19 @@ gulp.task 'clean', (cb) ->
     del ['lib/**'], cb
 
 gulp.task 'bundle', ->
-    bundler = browserify './src/sketch.coffee',
+    bundler = browserify './src/scribble.coffee',
         transform: ['coffeeify']
         extensions: ['.coffee']
         debug: no
-        standalone: 'sketchjs'
+        standalone: 'scribblejs'
     bundler.bundle()
-    .pipe source 'sketch.js'
+    .pipe source 'scribble.js'
     .pipe gulp.dest './lib'
 
 gulp.task 'transpile', ->
-    gulp.src './src/sketch.coffee'
+    gulp.src './src/scribble.coffee'
     .pipe coffee()
-    .pipe rename 'sketch.node.js'
+    .pipe rename 'scribble.node.js'
     .pipe gulp.dest './lib'
 
 gulp.task 'build', ['bundle', 'transpile']

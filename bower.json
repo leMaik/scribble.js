@@ -1,12 +1,12 @@
 {
-  "name": "sketch.js",
-  "version": "1.1.1",
-  "homepage": "https://github.com/leMaik/sketch.js",
+  "name": "scribble.js",
+  "version": "1.2.0",
+  "homepage": "https://github.com/leMaik/scribble.js",
   "authors": [
-    "Michael Bleigh and Intridea, Inc."
+    "Michael Bleigh and Intridea, Inc.",
     "Maik Marschner <mmarschner@welfenlab.de>"
   ],
-  "main": "./lib/sketch.js",
+  "main": "./lib/scribble.js",
   "license": "MIT",
   "ignore": [
     "**/.*",
