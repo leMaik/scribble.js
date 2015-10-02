@@ -106,6 +106,8 @@ scribblejs = ($) ->
           @redoStack = []
         @canvas.trigger "afterPaint", [@actions, old]
 
+      @canvas.on 'scribble:toolchanged', stop
+
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
         old = @getShapes()
@@ -140,7 +142,7 @@ scribblejs = ($) ->
       # of `#mycanvas` (mycanvas being the ID of your `<canvas>` element to
       # perform actions on the canvas.
       if @options.toolLinks
-        $('body').delegate "a[href=\"##{@canvas.attr('id')}\"]", 'click', (e)->
+        $('body').delegate "a[href=\"##{@canvas.attr('id')}\"]", 'click', (e) ->
           $this = $(this)
           $canvas = $($this.attr('href'))
           sketch = $canvas.data('scribble')
@@ -153,9 +155,9 @@ scribblejs = ($) ->
           # * `data-download`: Trigger a sketch download in the specified format.
           for key in ['color', 'size', 'tool']
             if $this.attr("data-#{key}")
-              sketch.set key, $(this).attr("data-#{key}")
+              sketch.set.call sketch, key, $(this).attr("data-#{key}")
           if $(this).attr('data-download')
-            sketch.download $(this).attr('data-download')
+            sketch.download.call sketch, $(this).attr('data-download')
 
           if $(this).attr('data-action')
             switch $this.attr('data-action')
@@ -224,8 +226,10 @@ scribblejs = ($) ->
     # *Internal method.* Sets an arbitrary instance variable on the Sketch instance
     # and triggers a `changevalue` event so that any appropriate bindings can take
     # place.
-    set: (key, value)->
+    set: (key, value) ->
       this[key] = value
+      if key == 'tool'
+        @canvas.trigger('scribble:toolchanged', value)
       @canvas.trigger("sketch.change#{key}", value)
 
     # ### sketch.redraw()
@@ -404,7 +408,7 @@ scribblejs = ($) ->
       actions[actions.length - 1].events.push event
 
       $('body').on 'keydown.sketchjstexttool', (e) ->
-        if e.keyCode == 13
+        if e.keyCode == 13 #enter
           e.preventDefault()
           if e.shiftKey
             fh = $.sketch.tools.text._determineFontHeight context.fontStyle
