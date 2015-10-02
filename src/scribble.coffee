@@ -90,7 +90,7 @@ scribblejs = ($) ->
           y: (e.pageY - @canvas.offset().top) / @scale
         }
 
-      currentTool = => $.sketch.tools[@tool]
+      currentTool = => $.scribble.tools[@tool]
 
       old = []
       painting = no
@@ -135,7 +135,7 @@ scribblejs = ($) ->
         $('body').delegate "a[href=\"##{@canvas.attr('id')}\"]", 'click', (e)->
           $this = $(this)
           $canvas = $($this.attr('href'))
-          sketch = $canvas.data('sketch')
+          sketch = $canvas.data('scribble')
           # Tool links are keyed off of HTML5 `data` attributes. The following
           # attributes are supported:
           #
@@ -284,7 +284,7 @@ scribblejs = ($) ->
 
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
-      actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
+      actions[actions.length - 1] = $.scribble.tools.marker.optimize actions[actions.length - 1]
       return actions
 
     draw: (action, context, scale) ->
@@ -316,7 +316,7 @@ scribblejs = ($) ->
 
     stopUse: (context, position, actions) ->
       actions[actions.length - 1].events.push position
-      actions[actions.length - 1] = $.sketch.tools.marker.optimize actions[actions.length - 1]
+      actions[actions.length - 1] = $.scribble.tools.marker.optimize actions[actions.length - 1]
       return actions
 
     draw: (action, context, scale) ->
