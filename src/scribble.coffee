@@ -411,7 +411,7 @@ scribblejs = ($) ->
         if e.keyCode == 13 #enter
           e.preventDefault()
           if e.shiftKey
-            fh = $.sketch.tools.text._determineFontHeight context.fontStyle
+            fh = $.scribble.tools.text._determineFontHeight context.fontStyle
             event =
               text: ''
               x: event.x
