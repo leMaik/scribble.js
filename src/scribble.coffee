@@ -78,7 +78,8 @@ scribblejs = ($) ->
           @redraw()
         bgImage.src = @canvas.data('background')
       @actions = []
-
+      @undoStack = []
+      @redoStack = []
 
       getCursorPosition = (e) =>
         return {x: 0, y: 0} if not e?
@@ -100,12 +101,19 @@ scribblejs = ($) ->
           painting = no
           @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
           @redraw()
-
+          if @redoStack.length > 0
+            @canvas.trigger "scribble:redoUnavailable"
+          @redoStack = []
         @canvas.trigger "afterPaint", [@actions, old]
 
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
         old = @getShapes()
+        @undoStack.push @getShapes()
+        if @undoStack.length == 1
+          @canvas.trigger "scribble:undoAvailable"
+        if @redoStack.length > 0
+          @canvas.trigger "scribble:redoUnavailable"
 
         @actions.push
           tool: @tool
@@ -148,6 +156,12 @@ scribblejs = ($) ->
               sketch.set key, $(this).attr("data-#{key}")
           if $(this).attr('data-download')
             sketch.download $(this).attr('data-download')
+
+          if $(this).attr('data-action')
+            switch $this.attr('data-action')
+              when 'undo' then sketch.undo()
+              when 'redo' then sketch.redo()
+
           false
 
     # ### sketch.download(format)
@@ -176,6 +190,34 @@ scribblejs = ($) ->
       @actions = shapes
       @redraw()
       @canvas.trigger("afterPaint", [@actions, old]) if not silent
+
+    undo: ->
+      if @undoStack.length > 0
+        @redoStack.push @getShapes()
+        @actions = @undoStack.pop()
+        @redraw()
+
+        if @undoStack.length == 0
+          @canvas.trigger "scribble:undoUnavailable"
+        if @redoStack.length == 1
+          @canvas.trigger "scribble:redoAvailable"
+
+        return true
+      return false
+
+    redo: ->
+      if @redoStack.length > 0
+        @undoStack.push @getShapes()
+        @actions = @redoStack.pop()
+        @redraw()
+
+        if @undoStack.length == 1
+          @canvas.trigger "scribble:undoAvailable"
+        if @redoStack.length == 0
+          @canvas.trigger "scribble:redoUnavailable"
+
+        return true
+      return false
 
     # ### sketch.set(key, value)
     #

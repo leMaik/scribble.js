@@ -11,7 +11,19 @@
           $('#tools').append("<a href='#tools_sketch' data-color='" + this + "' style='border: 1px solid black; width: 30px; height: 30px; background: " + this + "; display: inline-block;'></a> ");
         });
 
-        $('#tools_sketch').scribble();
+        $('#tools_sketch').scribble()
+        .on('scribble:undoAvailable', function(){
+          $('a[data-action=undo]').show();
+        })
+        .on('scribble:undoUnavailable', function(){
+          $('a[data-action=undo]').hide();
+        })
+        .on('scribble:redoAvailable', function(){
+          $('a[data-action=redo]').show();
+        })
+        .on('scribble:redoUnavailable', function(){
+          $('a[data-action=redo]').hide();
+        });
 
         $('#printshapes').on('click', function() {
           var sketch = $('#tools_sketch').scribble();
@@ -28,6 +40,9 @@
       <a href="#tools_sketch" data-tool="highlighter" data-size="20">Highlighter</a>
       <a href="#tools_sketch" data-tool="text" data-size="20">Text</a>
       <a href="#tools_sketch" data-tool="eraser">Eraser</a>
+
+      <a href="#tools_sketch" data-action="undo" style="display:none">Undo</a>
+      <a href="#tools_sketch" data-action="redo" style="display:none">Redo</a>
     </div>
     <canvas id='tools_sketch' width='400' height='400' style='border: 2px solid black' data-background="demo.png"></canvas>
     <button id="printshapes">Print shapes</button>
