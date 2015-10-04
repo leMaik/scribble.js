@@ -17,7 +17,13 @@ gulp.task 'bundle', ->
         debug: no
         standalone: 'scribblejs'
     bundler.bundle()
-    .pipe source 'scribble.js'
+    .pipe source 'scribble.browserified.js'
     .pipe gulp.dest './lib'
 
-gulp.task 'default', ['bundle']
+gulp.task 'transpile', ->
+    gulp.src './src/*.coffee'
+    .pipe coffee()
+    .pipe gulp.dest './lib'
+
+gulp.task 'build', ['bundle', 'transpile']
+gulp.task 'default', ['build']
