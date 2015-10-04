@@ -20,11 +20,4 @@ gulp.task 'bundle', ->
     .pipe source 'scribble.js'
     .pipe gulp.dest './lib'
 
-gulp.task 'transpile', ->
-    gulp.src './src/scribble.coffee'
-    .pipe coffee()
-    .pipe rename 'scribble.node.js'
-    .pipe gulp.dest './lib'
-
-gulp.task 'build', ['bundle', 'transpile']
-gulp.task 'default', ['build']
+gulp.task 'default', ['bundle']
