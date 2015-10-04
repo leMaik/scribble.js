@@ -67,6 +67,7 @@ scribblejs = ($) ->
         defaultTool: 'marker'
         defaultColor: '#000000'
         defaultSize: 5
+        undo: new Undo()
       }, opts
       @scale = 1
       @color = @options.defaultColor
@@ -81,7 +82,7 @@ scribblejs = ($) ->
         bgImage.src = @canvas.data('background')
       @actions = []
 
-      @_undo = new Undo()
+      @_undo = @options.undo
       @_undo.on 'undoAvailable', => @canvas.trigger "scribble:undoAvailable"
       @_undo.on 'undoUnavailable', => @canvas.trigger "scribble:undoUnavailable"
       @_undo.on 'redoAvailable', => @canvas.trigger "scribble:redoAvailable"
@@ -107,14 +108,25 @@ scribblejs = ($) ->
           painting = no
           @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
           @redraw()
-        @canvas.trigger "afterPaint", [@actions, old]
+
+          undoAction = (old, current) =>
+            undo: =>
+              @actions = old
+              @redraw()
+            redo: =>
+              @actions = current
+              @redraw()
+
+          @_undo.push undoAction(old.slice(0), @actions.slice(0))
+          console.log 'Pushed undo for %d shapes', @actions.length - old.length
+
+          @canvas.trigger "afterPaint", [@actions, old]
 
       @canvas.on 'scribble:toolchanged', stop
 
       @canvas.bind 'mousedown touchstart', (e) =>
         painting = yes
         old = @getShapes()
-        @_undo.push @getShapes()
 
         @actions.push
           tool: @tool
@@ -192,13 +204,9 @@ scribblejs = ($) ->
       @redraw()
       @canvas.trigger("afterPaint", [@actions, old]) if not silent
 
-    undo: ->
-      @actions = @_undo.undo @getShapes()
-      @redraw()
+    undo: -> @_undo.undo()
 
-    redo: ->
-      @actions = @_undo.redo @getShapes()
-      @redraw()
+    redo: -> @_undo.redo()
 
     # ### sketch.set(key, value)
     #

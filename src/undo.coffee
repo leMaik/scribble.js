@@ -5,39 +5,34 @@ class Undo extends EventEmitter
     @undoStack = []
     @redoStack = []
 
-  push: (state) ->
-    @undoStack.push state
+  push: (action) ->
+    @undoStack.push action
     if @undoStack.length == 1
       @trigger 'undoAvailable'
     if @redoStack.length > 0
       @redoStack = []
       @trigger 'redoUnavailable'
 
-  undo: (state) ->
+  undo: () ->
     if @undoStack.length > 0
-      @redoStack.push state
-      restoredState = @undoStack.pop()
+      action = @undoStack.pop()
+      action.undo()
+      @redoStack.push action
 
       if @undoStack.length == 0
         @trigger 'undoUnavailable'
       if @redoStack.length == 1
         @trigger 'redoAvailable'
 
-      return restoredState
-    else
-      return state
-
-  redo: (state) ->
+  redo: () ->
     if @redoStack.length > 0
-      @undoStack.push state
-      restoredState = @redoStack.pop()
+      action = @redoStack.pop()
+      action.redo()
+      @undoStack.push action
 
       if @undoStack.length == 1
         @trigger 'undoAvailable'
       if @redoStack.length == 0
         @trigger 'redoUnavailable'
-
-      return restoredState
-    return state
 
 module.exports = Undo
