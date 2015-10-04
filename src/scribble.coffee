@@ -118,13 +118,12 @@ scribblejs = ($) ->
               @redraw()
 
           @_undo.push undoAction(old.slice(0), @actions.slice(0))
-          console.log 'Pushed undo for %d shapes', @actions.length - old.length
-
           @canvas.trigger "afterPaint", [@actions, old]
 
       @canvas.on 'scribble:toolchanged', stop
 
       @canvas.bind 'mousedown touchstart', (e) =>
+        if painting then stop(e) #yes, this happens sometimes
         painting = yes
         old = @getShapes()
 
