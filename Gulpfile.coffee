@@ -16,6 +16,7 @@ gulp.task 'bundle', ->
         extensions: ['.coffee']
         debug: no
         standalone: 'scribblejs'
+    bundler.transform 'uglifyify'
     bundler.bundle()
     .pipe source 'scribble.browserified.js'
     .pipe gulp.dest './lib'
