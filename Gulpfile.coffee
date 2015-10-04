@@ -21,7 +21,7 @@ gulp.task 'bundle', ->
     .pipe gulp.dest './lib'
 
 gulp.task 'transpile', ->
-    gulp.src './src/*.coffee'
+    gulp.src './src/**/*.coffee'
     .pipe coffee()
     .pipe gulp.dest './lib'
 
