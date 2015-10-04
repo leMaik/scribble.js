@@ -470,6 +470,9 @@ scribblejs = ($) ->
 
 # ## Scribble.js module
 #
+# The undo class is also exposed.
+scribblejs.Undo = Undo
+
 # **Scribble.js** is exported as a function. Simply invoke it with `jQuery` as first argument
 # to activate it.
 module.exports = scribblejs
