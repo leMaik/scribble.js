@@ -1,4 +1,4 @@
-EventEmitter = require './events'
+EventEmitter = require 'event-emitter'
 
 class Undo extends EventEmitter
   constructor: ->
