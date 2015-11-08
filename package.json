@@ -44,7 +44,7 @@
     "url": "https://github.com/leMaik/scribble.js/issues"
   },
   "dependencies": {
-    "canvastext": "lemaik/canvastext",
+    "canvastext": "lemaik/canvastext#v0.1.0",
     "event-emitter": "lemaik/event-emitter"
   }
 }
