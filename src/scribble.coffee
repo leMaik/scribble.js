@@ -100,7 +100,7 @@ scribblejs = ($) ->
       stop = (e) =>
         if painting
           painting = no
-          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
+          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @scale
           @redraw()
 
           undoAction = (old, current) =>
@@ -117,27 +117,30 @@ scribblejs = ($) ->
       @canvas.on 'scribble:toolchanged', stop
 
       @canvas.bind 'mousedown touchstart', (e) =>
-        if painting then stop(e) #yes, this happens sometimes
-        painting = yes
-        old = @getShapes()
+        if !currentTool().usesMouse || !currentTool().usesMouse()
+          if painting then stop(e) #yes, this happens sometimes
+          painting = yes
+          old = @getShapes()
 
-        @actions.push
-          tool: @tool
-          color: @color
-          size: parseFloat(@size)
-          events: []
+          @actions.push
+            tool: @tool
+            color: @color
+            size: parseFloat(@size)
+            events: []
 
-        @actions = currentTool().startUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @redraw.bind(this), stop
-        @redraw()
-
-      @canvas.bind 'mousemove touchmove', (e) =>
-        if painting
-          @actions = currentTool().continueUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions
+          @actions = currentTool().startUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @redraw.bind(this), stop, @scale
           @redraw()
 
+      @canvas.bind 'mousemove touchmove', (e) =>
+        if !currentTool().usesMouse || !currentTool().usesMouse()
+          if painting
+            @actions = currentTool().continueUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @scale
+            @redraw()
+
       @canvas.bind 'mouseup mouseleave mouseout touchend touchcancel', (e) =>
-        if not currentTool().customStopHandling
-          stop(e)
+        if !currentTool().usesMouse || !currentTool().usesMouse()
+          if !currentTool().customStopHandling || !currentTool().customStopHandling()
+            stop(e)
 
 
       # ### Tool Links
@@ -216,8 +219,9 @@ scribblejs = ($) ->
     #
     # *Internal method.* Redraw the sketchpad from scratch using the aggregated
     # actions that have been stored as well as the action in progress if it has
-    # something renderable.
-    redraw: ->
+    # something renderable. If a predicate is specified, only matching actions
+    # are drawn.
+    redraw: (predicate) ->
       @el.width = @canvas.width()
       context = @el.getContext '2d'
 
@@ -234,7 +238,7 @@ scribblejs = ($) ->
 
       sketch = this
       for action in @actions
-        if action.tool
+        if action.tool and (!predicate || predicate(action))
           $.scribble.tools[action.tool].draw.call undefined, action, context, @scale
 
   # # Tools

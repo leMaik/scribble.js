@@ -1,3 +1,5 @@
+canvastext = require('canvastext')
+
 determineFontHeight: (fontStyle) ->
   body = document.getElementsByTagName("body")[0]
   dummy = document.createElement("div")
@@ -9,59 +11,55 @@ determineFontHeight: (fontStyle) ->
   body.removeChild(dummy)
   return result
 
+usesMouse = no
+
 # # text tool
 #
 # The text tool allows writing text on the sketch.
 module.exports =
-  customStopHandling: yes
+  customStopHandling: -> yes
+  usesMouse: -> usesMouse
 
-  startUse: (context, position, actions, redraw, stop) ->
-    $('body').off '.sketchjstexttool'
+  startUse: (context, position, actions, redraw, stop, scale) ->
+    usesMouse = yes
     event =
       text: ''
       x: position.x
       y: position.y
-    actions[actions.length - 1].events.push event
-
-    $('body').on 'keydown.sketchjstexttool', (e) ->
-      if e.keyCode == 13 #enter
-        e.preventDefault()
-        if e.shiftKey
-          fh = determineFontHeight context.fontStyle
-          event =
-            text: ''
-            x: event.x
-            y: event.y + fh
-          actions[actions.length - 1].events.push event
-        else
-          $('body').off '.sketchjstexttool'
-          stop()
-      else if e.keyCode == 8
-        e.preventDefault()
-        if event.text.length == 0
-          events = actions[actions.length - 1].events
-          if events.length > 1
-            events.pop()
-            event = events[events.length - 1]
-        else
-          event.text = event.text.substring(0, event.text.length - 1)
-        redraw()
-
-    $('body').on 'keypress.sketchjstexttool', (e) ->
-      event.text += String.fromCharCode(e.charCode)
-      redraw()
-      e.preventDefault()
-
+    action = actions[actions.length - 1]
+    action.events.push event
+    field = canvastext.field
+      canvas: context.canvas
+      x: position.x
+      y: position.y
+      width: 100
+      height: 100
+      clearContext: ->
+        redraw (a) ->  a != action
+        context.fillStyle = action.color
+        context.font = (action.size * scale) + 'px Arial'
+      onEnterPressed: -> stop()
+      onChange: ->
+        actions[actions.length - 1].events[0].text = field.text()
+    action.field = field
     return actions
 
   continueUse: (context, position, actions) ->
     return actions
 
   stopUse: (context, position, actions) ->
+    usesMouse = no
+    action = actions[actions.length - 1]
+    if action.field?
+      action.events[0].text = action.field.text()
+      action.field.dispose()
+      delete action.field
     return actions
 
   draw: (action, context, scale) ->
-    context.fillStyle = action.color
-    for event in action.events
+    if !action.field
+      context.fillStyle = action.color
       context.font = (action.size * scale) + 'px Arial'
-      context.fillText event.text, event.x * scale, event.y * scale
+      canvastext.draw(context.canvas, context, action.events[0].x, action.events[0].y, action.events[0].text.split('\n'))
+    else
+      action.field.repaint()
