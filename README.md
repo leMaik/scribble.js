@@ -3,7 +3,7 @@
 Scribble.js is an easy-to-use jQuery plugin that allows you to create canvases upon
  which visitors can draw. Originally, it was a fork if [Sketch.js][sketchjs] but there were just too many changes since then. The code is partially inspired by <a href='http://www.williammalone.com/articles/create-html5-canvas-javascript-drawing-app/'>William Malone's drawing app tutorial</a> as well as <a href='http://canvaspaint.org'>CanvasPaint</a>.
 
-[sketchjs]:https://github.com/intridea/sketch.js
+[sketchjs]: https://github.com/intridea/sketch.js
 
 ## Installation
 
@@ -19,9 +19,10 @@ Read the provided `README.md` for more information.
 You can see the simple examples online, these are a [simple drawing canvas][simple-demo],
 a drawing canvas [with color][colors-demo] and a third demo that shows the included [tools][tools-demo].
 
-[simple-demo]:https://rawgit.com/leMaik/scribble.js/master/example/simple.html
-[colors-demo]:https://rawgit.com/leMaik/scribble.js/master/example/colors.html
-[tools-demo]:https://rawgit.com/leMaik/scribble.js/master/example/tools.html
+[simple-demo]: https://rawgit.com/leMaik/scribble.js/master/example/simple.html
+[colors-demo]: https://rawgit.com/leMaik/scribble.js/master/example/colors.html
+[tools-demo]: https://rawgit.com/leMaik/scribble.js/master/example/tools.html
+[sharejs]: https://github.com/share/ShareJS
 
 ## License
 
