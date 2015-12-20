@@ -97,10 +97,12 @@ scribblejs = ($) ->
       old = []
       painting = no
 
-      stop = (e) =>
-        if painting
+      stop = (e, tool, oldTool) =>
+        oldTool = if oldTool then $.scribble.tools[oldTool] else currentTool()
+
+        if oldTool && (painting || oldTool.customStopHandling)
           painting = no
-          @actions = currentTool().stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @scale
+          @actions = oldTool.stopUse.call undefined, @canvas[0].getContext('2d'), getCursorPosition(e), @actions, @scale
           @redraw()
 
           undoAction = (old, current) =>
@@ -210,10 +212,11 @@ scribblejs = ($) ->
     # and triggers a `changevalue` event so that any appropriate bindings can take
     # place.
     set: (key, value) ->
+      old = this[key]
       this[key] = value
       if key == 'tool'
-        @canvas.trigger('scribble:toolchanged', value)
-      @canvas.trigger("sketch.change#{key}", value)
+        @canvas.trigger('scribble:toolchanged', [value, old])
+      @canvas.trigger("sketch.change#{key}", [value, old])
 
     # ### sketch.redraw()
     #
