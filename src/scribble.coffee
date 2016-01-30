@@ -227,22 +227,24 @@ scribblejs = ($) ->
     redraw: (predicate) ->
       @el.width = @canvas.width()
       context = @el.getContext '2d'
+      @drawOn(context, @canvas.width(), @canvas.height(), predicate)
 
+    drawOn: (context, width, height, predicate) ->
       if @background?
         ratio = @background.width / @background.height
-        newWidth = ratio * @canvas.height()
-        newHeight = @canvas.height()
-        if newWidth > @canvas.width()
-          newWidth = @canvas.width()
+        newWidth = ratio * height
+        newHeight = height
+        if newWidth > width
+          newWidth = width
           newHeight = newWidth / ratio
 
         context.drawImage @background, 0, 0, @background.width, @background.height,
                           0, 0, newWidth, newHeight
 
-      sketch = this
       for action in @actions
         if action.tool and (!predicate || predicate(action))
           $.scribble.tools[action.tool].draw.call undefined, action, context, @scale
+
 
   # # Tools
   #
