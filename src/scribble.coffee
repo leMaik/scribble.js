@@ -241,9 +241,17 @@ scribblejs = ($) ->
         context.drawImage @background, 0, 0, @background.width, @background.height,
                           0, 0, newWidth, newHeight
 
-      for action in @actions
-        if action.tool and (!predicate || predicate(action))
-          $.scribble.tools[action.tool].draw.call undefined, action, context, @scale
+      actions = if predicate? then @actions.filter(predicate) else @actions
+      Scribble.drawShapesOn(contect, actions, @scale)
+
+    # ### Scribble.drawShapesOn(context, shapes[, scale = 1])
+    #
+    # Draw the specified shapes on the context, as if the context was
+    # ana actual scribble.js canvas context.
+    @drawShapesOn: (context, shapes, scale) ->
+      for action in shapes when action.tool
+        $.scribble.tools[action.tool].draw.call(undefined, action, context, scale || 1)
+      return
 
 
   # # Tools
@@ -262,6 +270,8 @@ scribblejs = ($) ->
       eraser: require './tools/eraser'
       text: require './tools/text'
 
+
+  return Scribble
 
 # # Scribble.js module
 #
